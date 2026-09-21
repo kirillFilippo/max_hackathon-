@@ -1,0 +1,31 @@
+{
+  "name": "max-dosug-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Бот-ассистент организатора досуговых мероприятий в мессенджере MAX",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test --test-concurrency=1 test/*.test.ts",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docs:slides": "node scripts/build-slides.mjs"
+  },
+  "dependencies": {
+    "@maxhub/max-bot-api": "^0.3.1",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

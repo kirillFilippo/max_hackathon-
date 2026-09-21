@@ -1,0 +1,366 @@
+import { Bot, Webhook } from '@maxhub/max-bot-api';
+import { createServer, type Server } from 'node:http';
+
+import type { BotContext } from './bot/context.js';
+import type { AppDeps } from './bot/deps.js';
+import { registerHandlers } from './bot/handlers/index.js';
+import { createApiNotifier } from './bot/notifier.js';
+import type { BotSession } from './bot/session.js';
+import { runReminderTick, type ReminderRunResult } from './bot/reminderRunner.js';
+import { assertRunnableConfig, type AppConfig } from './config.js';
+import { migrate } from './db/migrate.js';
+import { createDb, type Db } from './db/pool.js';
+import { createRepositories } from './db/repositories/index.js';
+import { PgSessionStore } from './db/sessions.js';
+import { newFieldId } from './domain/ids.js';
+import { createLogger, type Logger } from './logger.js';
+import { EventService } from './services/eventService.js';
+import { ItemService } from './services/itemService.js';
+import { ParticipantService } from './services/participantService.js';
+import { ProfileService } from './services/profileService.js';
+import { ReminderService } from './services/reminderService.js';
+import { SettlementService } from './services/settlementService.js';
+import { TemplateService } from './services/templateService.js';
+import { startMiniappServer, type MiniappField, type MiniappHandle } from './miniapp/server.js';
+import { normalizeField } from './domain/questionnaire.js';
+import type { AnswerMode } from './domain/types.js';
+import { formatDateTime } from './domain/datetime.js';
+import { STATUS_LABELS } from './domain/types.js';
+import { registrationNotice } from './bot/texts/registration.js';
+import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
+
+export const BOT_COMMANDS = [
+  { name: 'new', description: 'Создать событие' },
+  { name: 'events', description: 'Мои события и панель участников' },
+  { name: 'templates', description: 'Наборы вопросов для участников' },
+  { name: 'join', description: 'Присоединиться к событию по коду' },
+  { name: 'duties', description: 'Мои расчёты с участниками' },
+  { name: 'profile', description: 'Профиль и реквизиты для переводов' },
+  { name: 'faq', description: 'Частые вопросы' },
+  { name: 'help', description: 'Как работает бот' },
+  { name: 'cancel', description: 'Прервать текущий шаг' },
+];
+
+/**
+ * Применяет поля, сохранённые в мини-приложении: заменяет вопросы в черновике
+ * организатора и обновляет сообщение мастера в чате.
+ */
+const applyMiniappFields = async (
+  deps: AppDeps,
+  userId: number,
+  fields: MiniappField[],
+  answerMode: AnswerMode,
+): Promise<void> => {
+  const { sessions: sessionStore, notifier } = deps;
+  const sessions = await sessionStore.findByUser(userId);
+  for (const { key, value } of sessions) {
+    const draft = value.draft;
+    if (!draft || (draft.kind !== 'create-event' && draft.kind !== 'edit-template')) continue;
+
+    draft.fields = fields.map((field) => normalizeField({ ...field, id: newFieldId() }));
+    draft.editor = null;
+    if (draft.kind === 'create-event') {
+      draft.data = { ...draft.data, answerMode };
+    }
+    await sessionStore.set(key, value);
+
+    const chatId = Number(key.split(':')[1]);
+    if (Number.isFinite(chatId)) {
+      const { fieldsEditor } = await import('./bot/texts/event.js');
+      await notifier.sendToUser(chatId, fieldsEditor(draft.fields, [], answerMode));
+    }
+    deps.logger.info(`Вопросы из мини-приложения сохранены (пользователь ${userId}, ${fields.length})`);
+    return;
+  }
+  deps.logger.warn(`Не найден активный мастер для сохранения вопросов (пользователь ${userId})`);
+};
+
+export interface AppHandle {
+  bot: Bot<BotContext>;
+  deps: AppDeps;
+  db: Db;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  tick(now?: Date): Promise<ReminderRunResult>;
+}
+
+export const createApp = async (
+  config: AppConfig,
+  logger: Logger = createLogger(config.logLevel),
+): Promise<AppHandle> => {
+  const db = createDb(
+    {
+      connectionString: config.databaseUrl,
+      maxConnections: config.databasePoolSize,
+      ssl: config.databaseSsl,
+    },
+    logger,
+  );
+  await db.ping();
+  await migrate(db, logger);
+
+  const repos = createRepositories(db);
+  const sessionStore = new PgSessionStore<BotSession>(db, config.sessionTtlHours * 3_600_000);
+  const removedSessions = await sessionStore.cleanupExpired();
+  if (removedSessions > 0) logger.info(`Удалено просроченных сессий: ${removedSessions}`);
+
+  const profiles = new ProfileService(repos);
+  const events = new EventService(repos, config);
+  const participants = new ParticipantService(repos);
+  const items = new ItemService(repos);
+  const settlements = new SettlementService(repos);
+  const templates = new TemplateService(repos);
+  const reminders = new ReminderService(repos, config);
+
+  const bot = new Bot<BotContext>(config.botToken);
+  const notifier = createApiNotifier(bot.api);
+
+  // Мини-приложение конструктора вопросов: включается, если задан MINIAPP_URL.
+  // Одноразовые подписи конструктора вопросов: живут ограниченное время.
+  const tickets = new Map<string, { userId: number; at: number }>();
+  const TICKET_TTL_MS = 15 * 60 * 1000;
+  let miniapp: MiniappHandle | null = null;
+  let miniappBridge: AppDeps['miniapp'] = null;
+
+  // В режиме вебхука обработчик апдейтов готовим сразу: сервер мини-приложения
+  // монтирует его на свой порт, поэтому наружу нужен один маршрут.
+  const webhookUrl = config.botMode === 'webhook' && config.webhookUrl ? new URL(config.webhookUrl) : null;
+  const webhookPath = webhookUrl
+    ? (webhookUrl.pathname === '/' ? config.webhookPath : webhookUrl.pathname)
+    : undefined;
+  const webhookHandler = webhookUrl
+    ? bot.webhookCallback({
+      domain: webhookUrl.origin,
+      path: webhookPath!,
+      port: config.webhookPort,
+      secret: config.webhookSecret,
+    })
+    : null;
+  /** Собственный сервер вебхука — включается, только если мини-приложение выключено. */
+  let ownWebhookServer: Server | null = null;
+
+  const deps: AppDeps = {
+    config,
+    logger,
+    repos,
+    profiles,
+    events,
+    participants,
+    items,
+    settlements,
+    templates,
+    reminders,
+    notifier,
+    sessions: sessionStore,
+    miniapp: null,
+  };
+
+  if (config.miniappUrl) {
+    miniapp = await startMiniappServer({
+      logger: logger.child('miniapp'),
+      baseUrl: config.miniappUrl,
+      webhookPath,
+      webhookHandler: webhookHandler ?? undefined,
+      port: config.miniappPort,
+      botToken: config.botToken,
+      devMode: config.miniappDev,
+      getQuestionnaire: async (code, userId) => {
+        const event = await events.findByCode(code);
+        if (!event) return null;
+        const [participant, profile] = await Promise.all([
+          userId === null ? Promise.resolve(null) : participants.find(event.id, userId),
+          userId === null ? Promise.resolve(null) : profiles.get(userId),
+        ]);
+        return {
+          event: {
+            code: event.code,
+            title: event.title,
+            startsAt: formatDateTime(event.startsAt, config.appTz),
+            place: event.place,
+          },
+          fields: event.fields,
+          me: {
+            name: participant?.name ?? profile?.name ?? '',
+            contact: participant?.contact ?? profile?.contact ?? '',
+            status: participant?.status ?? 'going',
+            answers: participant?.answers ?? {},
+          },
+        };
+      },
+      saveAnswers: async (submission) => {
+        const event = await events.findByCode(submission.code);
+        if (!event) return { ok: false, error: `Событие ${submission.code} не найдено` };
+        const result = await participants.save({
+          event,
+          userId: submission.userId,
+          name: submission.name,
+          username: submission.username,
+          contact: submission.contact,
+          status: submission.status,
+          answers: submission.answers,
+        });
+        if (!result.ok) {
+          return { ok: false, error: result.error, fieldId: result.failedField.id };
+        }
+        if (submission.contact) await profiles.saveContact(submission.userId, submission.contact);
+
+        const notification = registrationNotice(event, {
+          name: result.participant.name,
+          contact: result.participant.contact,
+          statusLabel: STATUS_LABELS[result.participant.status],
+          waitlisted: result.waitlisted,
+          answers: result.participant.answers,
+        });
+        try {
+          await notifier.sendToUser(event.organizerId, notification);
+        } catch (error) {
+          logger.warn('Не удалось уведомить организатора о заявке из мини-приложения', error);
+        }
+        logger.info(`Заявка из мини-приложения: событие ${event.code}, участник ${submission.userId}`);
+        return { ok: true };
+      },
+      takeTicket: (ticket) => {
+        // Не гасим сразу: при ошибке валидации организатор может исправить данные
+        // и нажать «Сохранить» ещё раз, пока тикет не истёк.
+        const owner = tickets.get(ticket);
+        if (!owner) return null;
+        if (Date.now() - owner.at > TICKET_TTL_MS) {
+          tickets.delete(ticket);
+          return null;
+        }
+        return owner;
+      },
+      consumeTicket: (ticket) => {
+        tickets.delete(ticket);
+      },
+      onFieldsSaved: async (userId, fields: MiniappField[], answerMode: AnswerMode) => {
+        await applyMiniappFields(deps, userId, fields, answerMode);
+      },
+    });
+    miniappBridge = {
+      buildUrl: (ticket, fields, answerMode) => miniapp!.buildUrl(ticket, fields, answerMode),
+      registerTicket: (ticket, owner) => {
+        tickets.set(ticket, owner);
+        miniapp!.registerTicket(ticket, owner);
+      },
+      takeTicket: (ticket) => {
+        const owner = tickets.get(ticket);
+        if (!owner) return null;
+        if (Date.now() - owner.at > TICKET_TTL_MS) {
+          tickets.delete(ticket);
+          return null;
+        }
+        return owner;
+      },
+    };
+    deps.miniapp = miniappBridge;
+    logger.info(`Мини-приложение вопросов: ${config.miniappUrl} (локальный порт ${miniapp.port})`);
+  }
+
+  registerHandlers(bot, deps, sessionStore);
+
+  let tickTimer: NodeJS.Timeout | null = null;
+  let ticking = false;
+
+  const tick = async (now: Date = new Date()): Promise<ReminderRunResult> => {
+    const empty: ReminderRunResult = { confirmSent: 0, finalSent: 0, closed: 0, errors: 0 };
+    if (ticking) return empty;
+    ticking = true;
+    try {
+      const result = await runReminderTick(deps, now);
+      if (result.confirmSent || result.finalSent || result.closed || result.errors) {
+        logger.info(
+          `Напоминания: подтверждение — ${result.confirmSent}, детали — ${result.finalSent}, `
+            + `закрыто событий — ${result.closed}, ошибок — ${result.errors}`,
+        );
+      }
+      return result;
+    } catch (error) {
+      logger.error('Ошибка планировщика напоминаний', error);
+      return { ...empty, errors: 1 };
+    } finally {
+      ticking = false;
+    }
+  };
+
+  const start = async (): Promise<void> => {
+    assertRunnableConfig(config);
+    logger.info(`Сертификаты: ${inspectCaCert().note}`);
+    logger.info(`База данных: ${config.databaseUrl.replace(/:[^:@/]+@/, ':***@')}`);
+
+    let botInfo;
+    try {
+      botInfo = await bot.api.getMyInfo();
+    } catch (error) {
+      if (isCertificateError(error)) logger.error(certificateHint());
+      throw error;
+    }
+    bot.botInfo = botInfo;
+    logger.info(`Бот @${botInfo.username ?? 'unknown'} (id ${botInfo.user_id}), режим ${config.botMode}`);
+
+    try {
+      await bot.api.setMyCommands(BOT_COMMANDS);
+    } catch (error) {
+      logger.warn('Не удалось опубликовать подсказки команд, это не критично', error);
+    }
+
+    if (config.botMode === 'webhook' && webhookUrl && webhookHandler) {
+      const subscriptionUrl = `${webhookUrl.origin}${webhookPath}`;
+      // Чистим прежние подписки (кроме нашей) и подписываемся заново.
+      try {
+        await Webhook.clearSubscriptions(bot.api, subscriptionUrl);
+      } catch (error) {
+        logger.warn('Не удалось очистить прежние подписки', error);
+      }
+      try {
+        await bot.api.subscribe(subscriptionUrl, config.webhookSecret);
+        logger.info(`Подписка на ${subscriptionUrl} активна`);
+      } catch (error) {
+        logger.error('Не удалось подписаться на вебхук', error);
+        throw error;
+      }
+
+      if (miniapp) {
+        logger.info(`Webhook обслуживает сервер мини-приложения на порту ${miniapp.port}`);
+      } else {
+        const server = createServer((req, res) => webhookHandler(req, res));
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(config.webhookPort, '0.0.0.0', () => resolve());
+        });
+        ownWebhookServer = server;
+        logger.info(`Webhook слушает порт ${config.webhookPort}`);
+      }
+    } else {
+      void bot.startPolling({ retry: true }).catch((error: unknown) => {
+        logger.error('Long polling остановлен с ошибкой', error);
+        if (isCertificateError(error)) logger.error(certificateHint());
+      });
+      logger.info(`Long polling запущен, напоминания проверяются каждые ${config.reminderTickSeconds} с`);
+    }
+
+    tickTimer = setInterval(() => void tick(), config.reminderTickSeconds * 1000);
+    await tick();
+  };
+
+  const stop = async (): Promise<void> => {
+    if (tickTimer) {
+      clearInterval(tickTimer);
+      tickTimer = null;
+    }
+    bot.stopPolling();
+    try {
+      await bot.stopWebhook();
+    } catch {
+      // Вебхук мог быть не запущен.
+    }
+    await miniapp?.close();
+    if (ownWebhookServer) {
+      await new Promise<void>((resolve) => ownWebhookServer!.close(() => resolve()));
+    }
+    await db.close();
+    logger.info('Остановлено, соединение с БД закрыто');
+  };
+
+  return { bot, deps, db, start, stop, tick };
+};

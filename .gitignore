@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+.tmp/
+.env
+.env.*
+!.env.server.example
+!*.example
+!.env.example
+*.log
+npm-debug.log*
+.DS_Store
+.tmp-tests/
+certs/*.pem
+certs/*.crt
+.npm-cache/

@@ -1,0 +1,16 @@
+node_modules
+dist
+data
+.git
+.gitignore
+.tmp
+*.log
+.env
+.env.*
+!.env.example
+test
+scripts
+.tmp-tests
+certs/*.pem
+certs/*.crt
+.npm-cache
