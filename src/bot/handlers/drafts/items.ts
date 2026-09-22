@@ -1,6 +1,6 @@
 import { parsePriceKopecks } from '../../../domain/money.js';
 import { CB } from '../../callbacks.js';
-import { show, type BotContext } from '../../context.js';
+import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
@@ -37,7 +37,7 @@ export const handleItemsAddDraft = async (
   deps: AppDeps,
   draft: ItemsAddDraft,
 ): Promise<boolean> => {
-  const input = ctx.message?.body.text ?? '';
+  const input = userText(ctx);
   const event = await deps.events.findById(draft.eventId);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
@@ -95,7 +95,7 @@ export const handleItemReserveDraft = async (
     return true;
   }
   if (ctx.session) ctx.session.draft = null;
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
   if (!input) {
     const items = await deps.items.list(event.id);
     await show(ctx, reserveNumbersPrompt(event, items));
@@ -148,7 +148,7 @@ export const handleItemPriceDraft = async (
     await show(ctx, withKeyboard('Событие не найдено.', menuRow));
     return true;
   }
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
   if (!input) {
     const item = await deps.items.find(draft.itemId);
     if (item) await show(ctx, itemPricePrompt(item));

@@ -3,6 +3,8 @@ import { normalizeField } from '../../../domain/questionnaire.js';
 import { FIELD_TYPE_LABELS, type FieldType } from '../../../domain/types.js';
 import {
   CB,
+  cbDraftEditorCancel,
+  cbDraftEditorSkip,
   cbDraftFieldMultiple,
   cbDraftFieldRequired,
   cbDraftFieldType,
@@ -38,7 +40,12 @@ const REQUIRED_BUTTONS: KeyboardRows = [
   [cb('Сделать необязательным', cbDraftFieldRequired(false))],
 ];
 
-const skipRow: KeyboardRows = [[cb('Пропустить', CB.draftSkip)]];
+/**
+ * У шага редактора свои payload'ы: иначе «Пропустить» ограничение и «Дальше»
+ * мастера — одна и та же кнопка, и сохранение срабатывало посреди вопроса.
+ */
+const skipRow: KeyboardRows = [[cb('Пропустить', cbDraftEditorSkip())]];
+const cancelRow: KeyboardRows = [[cb('Отмена', cbDraftEditorCancel())]];
 
 const parseNumberOrNull = (input: string): number | null | undefined => {
   const raw = input.trim().replace(',', '.');
@@ -51,7 +58,7 @@ export const startFieldEditor = (host: FieldEditorHost): MessageContent => {
   host.editor = { step: 'label', draft: {} };
   return withKeyboard(
     ['Новый вопрос', '', 'Отправьте текст вопроса, который увидит участник.'].join('\n'),
-    [[cb('Отмена', CB.draftSkip)]],
+    cancelRow,
   );
 };
 
@@ -59,7 +66,7 @@ export const renderEditorScreen = (editor: FieldEditorState): MessageContent => 
   const label = editor.draft.label ?? '';
   switch (editor.step) {
     case 'label':
-      return withKeyboard('Новый вопрос\n\nОтправьте текст вопроса.', [[cb('Отмена', CB.draftSkip)]]);
+      return withKeyboard('Новый вопрос\n\nОтправьте текст вопроса.', cancelRow);
     case 'type':
       return withKeyboard(`Вопрос: ${label}\n\nКак участник ответит?`, TYPE_BUTTONS);
     case 'options':
@@ -69,7 +76,7 @@ export const renderEditorScreen = (editor: FieldEditorState): MessageContent => 
           '',
           `Перечислите варианты через запятую (до ${MAX_OPTIONS}).`,
         ].join('\n'),
-        [[cb('Отмена', CB.draftSkip)]],
+        cancelRow,
       );
     case 'multiple':
       return withKeyboard(`Вопрос: ${label}\n\nСколько вариантов можно выбрать?`, MULTIPLE_BUTTONS);
@@ -188,9 +195,20 @@ export const handleFieldEditorCallback = (
   if (!editor || action !== 'draft') return false;
 
   const command = args[0];
-  if (command === 'skip') {
+  if (command === 'editorcancel') {
+    // Пользователь отказался от вопроса.
+    host.editor = null;
+    return true;
+  }
+  if (command === 'editorskip') {
     if (editor.step === 'label' || editor.step === 'type' || editor.step === 'options') {
       host.editor = null;
+      return true;
+    }
+    if (editor.step === 'required') {
+      // Пропуск на последнем шаге = «оставить обязательным»: вопрос добавляется.
+      editor.draft.required = true;
+      commitField(host);
       return true;
     }
     advance(editor, editor.step);

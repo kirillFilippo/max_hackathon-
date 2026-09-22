@@ -27,6 +27,7 @@ import type { AnswerMode } from './domain/types.js';
 import { formatDateTime } from './domain/datetime.js';
 import { STATUS_LABELS } from './domain/types.js';
 import { registrationNotice } from './bot/texts/registration.js';
+import { applyMiniappFields, readDraftQuestionnaire } from './bot/handlers/miniappSync.js';
 import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
 
 export const BOT_COMMANDS = [
@@ -40,57 +41,6 @@ export const BOT_COMMANDS = [
   { name: 'help', description: 'Как работает бот' },
   { name: 'cancel', description: 'Прервать текущий шаг' },
 ];
-
-/** Активные черновики вопросов пользователя: событие или шаблон. */
-type QuestionDraft = Extract<BotSession['draft'], { kind: 'create-event' | 'edit-template' }>;
-
-const activeQuestionDrafts = async (deps: AppDeps, userId: number): Promise<QuestionDraft[]> => {
-  const sessions = await deps.sessions.findByUser(userId);
-  return sessions
-    .map(({ value }) => value.draft)
-    .filter((draft): draft is QuestionDraft =>
-      Boolean(draft && (draft.kind === 'create-event' || draft.kind === 'edit-template')));
-};
-
-/**
- * Применяет поля, сохранённые в мини-приложении: заменяет вопросы в черновике
- * организатора и обновляет сообщение мастера в чате.
- */
-const applyMiniappFields = async (
-  deps: AppDeps,
-  userId: number,
-  fields: MiniappField[],
-  answerMode: AnswerMode,
-  name = '',
-): Promise<void> => {
-  const { sessions: sessionStore, notifier } = deps;
-  const sessions = await sessionStore.findByUser(userId);
-  for (const { key, value } of sessions) {
-    const draft = value.draft;
-    if (!draft || (draft.kind !== 'create-event' && draft.kind !== 'edit-template')) continue;
-
-    draft.fields = fields.map((field) => normalizeField({ ...field, id: newFieldId() }));
-    draft.editor = null;
-    if (draft.kind === 'create-event') {
-      draft.data = {
-        ...draft.data,
-        answerMode,
-        // Название набора из конструктора: в чате не придётся вводить его снова.
-        saveTemplateName: name || draft.data.saveTemplateName || null,
-      };
-    }
-    await sessionStore.set(key, value);
-
-    const chatId = Number(key.split(':')[1]);
-    if (Number.isFinite(chatId)) {
-      const { fieldsEditor } = await import('./bot/texts/event.js');
-      await notifier.sendToUser(chatId, fieldsEditor(draft.fields, [], answerMode));
-    }
-    deps.logger.info(`Вопросы из мини-приложения сохранены (пользователь ${userId}, ${fields.length})`);
-    return;
-  }
-  deps.logger.warn(`Не найден активный мастер для сохранения вопросов (пользователь ${userId})`);
-};
 
 export interface AppHandle {
   bot: Bot<BotContext>;
@@ -250,33 +200,9 @@ export const createApp = async (
       consumeTicket: (ticket) => {
         tickets.delete(ticket);
       },
-      getDraft: async (userId) => {
-        // Конструктор открывается из мастера: отдаём текущие вопросы и режим.
-        for (const draft of await activeQuestionDrafts(deps, userId)) {
-          // У шаблона нет режима ответа и названия набора: они нужны только событию.
-          const data = draft.kind === 'create-event' ? draft.data : undefined;
-          return {
-            fields: draft.fields.map((field) => ({
-              label: field.label,
-              type: field.type,
-              options: field.options,
-              multiple: field.multiple,
-              minSelected: field.minSelected,
-              maxSelected: field.maxSelected,
-              min: field.min,
-              max: field.max,
-              maxLength: field.maxLength,
-              required: field.required,
-            })),
-            answerMode: data?.answerMode ?? 'auto',
-            name: data?.saveTemplateName ?? '',
-          };
-        }
-        return null;
-      },
-      onFieldsSaved: async (userId, fields, answerMode, name) => {
-        await applyMiniappFields(deps, userId, fields, answerMode, name);
-      },
+      getDraft: (userId) => readDraftQuestionnaire(deps, userId),
+      onFieldsSaved: (userId, fields, answerMode, name) =>
+        applyMiniappFields(deps, userId, fields, answerMode, name),
     });
     miniappBridge = {
       buildUrl: (ticket) => miniapp!.buildUrl(ticket),

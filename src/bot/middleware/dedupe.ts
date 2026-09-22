@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { MiddlewareFn } from '@maxhub/max-bot-api';
 
 import type { BotContext } from '../context.js';
@@ -40,6 +42,12 @@ export interface DedupeOptions {
   exactTtlMs?: number;
   /** Сколько помнить смысловые нажатия (двойной тап). */
   actionTtlMs?: number;
+  /**
+   * Короткое окно «то же действие»: два нажатия одной кнопки подряд быстрее этого
+   * времени считаем двойным тапом, даже если экран уже сменился. Живой человек
+   * между осознанными нажатиями успевает прочитать новый экран.
+   */
+  sameActionCooldownMs?: number;
   /** Предел записей, чтобы память не росла. */
   maxEntries?: number;
 }
@@ -47,10 +55,24 @@ export interface DedupeOptions {
 interface SlimUpdate {
   update_type?: string;
   timestamp?: number;
-  message?: { body?: { mid?: string } | null } | null;
+  message?: {
+    body?: { mid?: string; text?: string | null; attachments?: unknown } | null;
+  } | null;
   callback?: { payload?: string | null } | null;
   user?: { user_id?: number } | null;
 }
+
+/**
+ * Отпечаток экрана: текст сообщения и клавиатура. Нужен, потому что после
+ * обработки шага бот редактирует то же сообщение — и на соседних шагах часто
+ * стоит одна и та же кнопка (например, «Пропустить»). Без отпечатка повторное
+ * нажатие такой кнопки считалось бы дублем и мастер застревал.
+ */
+const screenFingerprint = (message: SlimUpdate['message']): string => {
+  const text = message?.body?.text ?? '';
+  const attachments = JSON.stringify(message?.body?.attachments ?? []);
+  return createHash('sha1').update(`${text}\u0000${attachments}`).digest('hex').slice(0, 12);
+};
 
 export class UpdateDeduplicator {
   private readonly seen = new Map<string, number>();
@@ -66,6 +88,10 @@ export class UpdateDeduplicator {
 
   private get actionTtl(): number {
     return this.options.actionTtlMs ?? 20 * 1000;
+  }
+
+  private get sameActionCooldown(): number {
+    return this.options.sameActionCooldownMs ?? 250;
   }
 
   private get maxEntries(): number {
@@ -87,10 +113,19 @@ export class UpdateDeduplicator {
     const exactDuplicate = this.touch(exactKey, now, this.exactTtl);
 
     // Смысловой ключ только для кнопок: у текстовых сообщений mid уникален.
-    // Повторяемые действия (мультивыбор, обновление) под него не попадают.
+    // В ключ входит отпечаток экрана, иначе одинаковые кнопки на соседних шагах
+    // (после редактирования сообщения) блокировали бы переход.
     let actionDuplicate = false;
     if (type === 'message_callback' && mid && !isRepeatableAction(payload)) {
-      actionDuplicate = this.touch(`a:${userId}:${mid}:${payload}`, now, this.actionTtl);
+      const actionKey = `a:${userId}:${mid}:${payload}`;
+      const screen = screenFingerprint(update.message);
+      // Тот же экран — двойной тап (даже если он пришёл позже).
+      const sameScreen = this.seen.get(`${actionKey}:${screen}`) !== undefined;
+      // Другой экран, но подряд быстрее кулдауна — тоже двойной тап.
+      const tooFast = now - (this.seen.get(`${actionKey}:last`) ?? 0) < this.sameActionCooldown;
+      actionDuplicate = sameScreen || tooFast;
+      this.touch(`${actionKey}:${screen}`, now, this.actionTtl);
+      this.touch(`${actionKey}:last`, now, this.actionTtl);
     }
 
     this.trim();

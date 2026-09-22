@@ -43,7 +43,7 @@ import {
 import { startCreateEvent } from '../drafts/createEvent.js';
 import { startAddItems, startItemPrice, startReserveNumbers } from '../drafts/items.js';
 import { startEditField } from '../drafts/editEvent.js';
-import { startTemplateEdit, startTemplateRename } from '../drafts/templates.js';
+import { startTemplateCreate, startTemplateEdit, startTemplateRename } from '../drafts/templates.js';
 import { quickStatusChange, startEditRegistration, startRegistration } from '../drafts/register.js';
 import { editMenu } from '../../texts/event.js';
 import { menuRow } from '../helpers.js';
@@ -236,6 +236,9 @@ export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<vo
           return;
         case 'delok':
           await deleteTemplate(ctx, deps, templateId);
+          return;
+        case 'new':
+          await startTemplateCreate(ctx, deps);
           return;
         default:
           await showTemplates(ctx, deps);

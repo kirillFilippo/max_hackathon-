@@ -70,6 +70,7 @@ export type EditField = 'startsAt' | 'place' | 'description' | 'title' | 'limit'
 export type DraftState =
   | ({ kind: 'create-event'; step: CreateEventStep; data: EventDraftData } & FieldEditorHost)
   | ({ kind: 'edit-template'; templateId: string; name: string } & FieldEditorHost)
+  | ({ kind: 'new-template'; step: 'name' | 'fields'; name?: string } & FieldEditorHost)
   | { kind: 'register'; step: RegisterStep; data: RegisterDraftData }
   | { kind: 'rename-template'; step: 'name'; templateId: string }
   | {

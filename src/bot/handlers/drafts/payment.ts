@@ -1,5 +1,5 @@
 import { CB } from '../../callbacks.js';
-import { show, type BotContext } from '../../context.js';
+import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
@@ -18,7 +18,7 @@ export const handlePaymentDetailsDraft = async (
   deps: AppDeps,
   draft: PaymentDetailsDraft,
 ): Promise<boolean> => {
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
   const request = await deps.settlements.find(draft.requestId);
   if (!request) {
     if (ctx.session) ctx.session.draft = null;
@@ -53,7 +53,7 @@ export const handleProfileContactDraft = async (
   deps: AppDeps,
   _draft: ProfileContactDraft,
 ): Promise<boolean> => {
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
   if (!input) {
     const profile = await deps.profiles.get(userIdOf(ctx));
     await show(ctx, contactPrompt(profile));
@@ -71,7 +71,7 @@ export const handleProfilePaymentDraft = async (
   deps: AppDeps,
   draft: ProfilePaymentDraft,
 ): Promise<boolean> => {
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
 
   if (draft.step === 'bank') {
     if (!input) {

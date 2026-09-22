@@ -1,0 +1,28 @@
+#!/bin/sh
+# Сторож туннеля: если бот локально жив, а публичный адрес не отвечает —
+# значит залипла обратная SSH-сессия. После трёх неудач подряд перезапускаем туннель.
+exec 2>&1
+
+PUBLIC="${DOSUG_PUBLIC:-https://minimax.zmeyka.dev}"
+LOCAL="${DOSUG_LOCAL:-http://127.0.0.1:8090}"
+FAILS=0
+
+while true; do
+  sleep 120
+  if ! curl -fsS -m 8 "$LOCAL/health" >/dev/null 2>&1; then
+    # Локально не отвечает — проблема не в туннеле, не трогаем
+    FAILS=0
+    continue
+  fi
+  if curl -4 -fsS -m 12 "$PUBLIC/health" >/dev/null 2>&1; then
+    FAILS=0
+    continue
+  fi
+  FAILS=$((FAILS + 1))
+  echo "$(date -Is) публичный адрес не отвечает (неудача $FAILS из 3)"
+  if [ "$FAILS" -ge 3 ]; then
+    echo "$(date -Is) перезапускаю dosug-tunnel"
+    sv restart dosug-tunnel
+    FAILS=0
+  fi
+done

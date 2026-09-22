@@ -1,7 +1,7 @@
 import { parseLimit, parseUserDateTime } from '../../../domain/datetime.js';
 import { addressWarning, normalizePlace } from '../../../domain/maps.js';
 import { parseCallback } from '../../callbacks.js';
-import { show, type BotContext } from '../../context.js';
+import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import {
   cancelRow,
@@ -64,7 +64,7 @@ export const handleEditEventDraft = async (
   const { action, args } = isCallback
     ? parseCallback(ctx.callback?.payload ?? '')
     : { action: '', args: [] as string[] };
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
 
   const applyEdit = async (patch: Record<string, unknown>): Promise<void> => {
     const { event: updated, changes } = await deps.events.update(event.id, patch);

@@ -28,6 +28,7 @@ export const CB = {
 
   draftCancel: 'draft:cancel',
   draftSkip: 'draft:skip',
+  templateNew: 'tpl:new',
   draftSaveTemplate: 'draft:savetpl:yes',
   draftBack: 'draft:back',
   draftPublish: 'draft:publish',
@@ -74,12 +75,16 @@ export const cbDraftTemplate = (templateId: string): string => `draft:template:$
 export const cbDraftFieldType = (type: string): string => `draft:fieldtype:${type}`;
 export const cbDraftFieldRequired = (required: boolean): string => `draft:fieldreq:${required ? 'yes' : 'no'}`;
 export const cbDraftFieldRemove = (index: number): string => `draft:fieldremove:${index}`;
+export const cbDraftEditorSkip = (): string => 'draft:editorskip';
+export const cbDraftEditorCancel = (): string => 'draft:editorcancel';
 export const cbDraftFieldMultiple = (multiple: boolean): string =>
   `draft:fieldmulti:${multiple ? 'yes' : 'no'}`;
 export const cbDraftFieldPreset = (label: string): string => `draft:fieldpreset:${label}`;
 export const cbQuestionsApp = (scope: 'draft' | string): string => `app:questions:${scope}`;
 export const cbQuestionsModeShow = (scope: string): string => `q:mode:${scope}`;
 export const cbQuestionsModeSet = (scope: string, mode: string): string => `q:set:${scope}:${mode}`;
+/** Возврат из экрана способа ответа к списку вопросов черновика. */
+export const cbQuestionsModeBack = (scope: string): string => `q:back:${scope}`;
 export const cbRegToggle = (fieldIndex: number, optionIndex: number): string =>
   `reg:toggle:${fieldIndex}:${optionIndex}`;
 

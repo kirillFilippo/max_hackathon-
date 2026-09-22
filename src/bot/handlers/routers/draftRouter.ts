@@ -11,7 +11,11 @@ import {
   handleProfilePaymentDraft,
 } from '../drafts/payment.js';
 import { handleRegisterDraft } from '../drafts/register.js';
-import { handleEditTemplateDraft, handleRenameTemplateDraft } from '../drafts/templates.js';
+import {
+  handleEditTemplateDraft,
+  handleNewTemplateDraft,
+  handleRenameTemplateDraft,
+} from '../drafts/templates.js';
 import { showMainMenu } from '../features/events.js';
 import { userIdOf } from '../helpers.js';
 
@@ -20,7 +24,10 @@ const ownsAction = (kind: string, action: string): boolean => {
   if (action === 'draft') return true;
   if (kind === 'register' && action === 'reg') return true;
   // Вопросы и вход в конструктор мини-приложения — часть мастера события.
-  if ((kind === 'create-event' || kind === 'edit-template') && (action === 'q' || action === 'app')) {
+  if (
+    (kind === 'create-event' || kind === 'edit-template' || kind === 'new-template')
+    && (action === 'q' || action === 'app')
+  ) {
     return true;
   }
   return false;
@@ -83,6 +90,8 @@ export const handleDraft = async (ctx: BotContext, deps: AppDeps): Promise<boole
       return handleRenameTemplateDraft(ctx, deps, draft);
     case 'edit-template':
       return handleEditTemplateDraft(ctx, deps, draft);
+    case 'new-template':
+      return handleNewTemplateDraft(ctx, deps, draft);
     default: {
       if (ctx.session) ctx.session.draft = null;
       await show(ctx, withKeyboard('Черновик устарел, начните заново.', [

@@ -6,7 +6,7 @@ import {
 } from '../../domain/questionnaire.js';
 import type { AnswerMode } from '../../domain/types.js';
 import { newTicket } from '../../miniapp/server.js';
-import { CB, cbQuestionsModeSet } from '../callbacks.js';
+import { CB, cbEventCard, cbQuestionsModeBack, cbQuestionsModeSet } from '../callbacks.js';
 import { show, type BotContext } from '../context.js';
 import type { AppDeps } from '../deps.js';
 import { button, cb, withKeyboard, type MessageContent } from '../message.js';
@@ -14,9 +14,12 @@ import type { EventDraftData, FieldEditorHost } from '../session.js';
 import { fieldsEditor } from '../texts/event.js';
 import { userIdOf } from './helpers.js';
 
-/** Черновик, у которого есть вопросы и (для события) выбранный способ ответа. */
+/**
+ * Черновик с вопросами. Способ ответа и выбранный шаблон есть только у события,
+ * поэтому здесь достаточно минимального набора полей — подходит и для наборов.
+ */
 export interface QuestionsHost extends FieldEditorHost {
-  data?: EventDraftData;
+  data?: Pick<EventDraftData, 'templateId' | 'answerMode'>;
 }
 
 /** Подсказки для экрана вопросов: поля выбранного шаблона и частые вопросы. */
@@ -109,7 +112,12 @@ export const answerModeScreen = (
   const rows = (['auto', 'chat', 'miniapp'] as AnswerMode[]).map((value) => [
     cb(`${value === mode ? '• ' : ''}${labels[value]}`, cbQuestionsModeSet(scope, value)),
   ]);
-  rows.push([cb('Вернуться к вопросам', CB.draftSkip)]);
+  // Возврат ведёт туда, откуда пришли: у черновика — к списку вопросов, у события — к карточке.
+  rows.push([
+    scope === 'draft'
+      ? cb('Вернуться к вопросам', cbQuestionsModeBack(scope))
+      : cb('К событию', cbEventCard(scope)),
+  ]);
 
   return withKeyboard(
     [

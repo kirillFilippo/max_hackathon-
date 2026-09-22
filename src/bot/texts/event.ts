@@ -24,6 +24,8 @@ import { STATUS_LABELS } from '../../domain/types.js';
 import {
   buildInviteUrl,
   CB,
+  cbDraftFieldPreset,
+  cbDraftFieldRemove,
   cbEventInfo,
   cbQuestionsApp,
   cbQuestionsModeShow,
@@ -363,21 +365,33 @@ export const fieldsEditor = (
   const lines = [
     'Вопросы участникам',
     `Вес: ${questionnaireWeight(fields)} (порог 10). Отвечают ${EFFECTIVE_MODE_LABELS[effective]}.`,
-    'Вопросы собираются в мини-приложении — там же задаются типы и ограничения ответов.',
-    'Все вопросы по умолчанию обязательные, обязательность можно снять в приложении.',
+    'Вопросы по умолчанию обязательные; обязательность снимается при создании вопроса.',
     '',
   ];
   if (fields.length === 0) {
-    lines.push('Пока вопросов нет.');
+    lines.push('Пока вопросов нет: добавьте свой или возьмите готовый из списка.');
   } else {
     fields.forEach((field, index) => lines.push(`${index + 1}. ${describeField(field)}`));
   }
 
-  const rows: KeyboardRows = [
-    [cb('Открыть конструктор вопросов', cbQuestionsApp('draft'))],
-    [cb('Способ ответа', cbQuestionsModeShow('draft')), cb('Дальше', CB.draftSkip)],
-  ];
-  return withKeyboard(lines.join('\n'), rows);
+  return withKeyboard(lines.join('\n'), fieldsEditorRows(fields, suggestions, 'draft'));
+};
+
+/** Кнопки экрана вопросов: удаление, подсказки, свой вопрос, мини-приложение, режим. */
+const fieldsEditorRows = (
+  fields: EventField[],
+  suggestions: string[],
+  scope: string,
+): KeyboardRows => {
+  const rows: KeyboardRows = fields
+    .slice(0, 6)
+    .map((field, index) => [cb(`Удалить: ${truncate(field.label, 20)}`, cbDraftFieldRemove(index))]);
+  for (const suggestion of suggestions.slice(0, 4)) {
+    rows.push([cb(`Взять: ${truncate(suggestion, 24)}`, cbDraftFieldPreset(suggestion))]);
+  }
+  rows.push([cb('Свой вопрос', CB.draftFieldAdd), cb('Конструктор в приложении', cbQuestionsApp(scope))]);
+  rows.push([cb('Способ ответа', cbQuestionsModeShow(scope)), cb('Готово', CB.draftSkip)]);
+  return rows;
 };
 
 export const editMenu = (event: DosugEvent): MessageContent =>
@@ -413,6 +427,8 @@ export const templatesList = (custom: Template[], presets: Template[]): MessageC
   const rows: KeyboardRows = custom
     .slice(0, 6)
     .map((template) => [cb(truncate(template.name, 30), `tpl:use:${template.id}`)]);
+  // Набор вопросов можно собрать и из меню, не создавая событие.
+  rows.push([cb('Создать набор вопросов', CB.templateNew)]);
   rows.push([cb('В меню', CB.menuMain)]);
   return withKeyboard(lines.join('\n'), rows);
 };
@@ -438,18 +454,19 @@ export const templateCard = (template: Template): MessageContent => {
 };
 
 export const templateFieldsEditor = (name: string, fields: EventField[]): MessageContent => {
-  const lines = [`Шаблон: ${name}`, '', 'Вопросы собираются в мини-приложении.'];
+  const lines = [`Набор «${name}»`, ''];
   if (fields.length === 0) {
-    lines.push('', 'Пока вопросов нет.');
+    lines.push('Пока вопросов нет: добавьте свой или соберите набор в приложении.');
   } else {
-    lines.push('');
     fields.forEach((field, index) => lines.push(`${index + 1}. ${describeField(field)}`));
   }
 
-  return withKeyboard(lines.join('\n'), [
-    [cb('Открыть конструктор вопросов', cbQuestionsApp('draft'))],
-    [cb('Сохранить', CB.draftSkip)],
-  ]);
+  const rows: KeyboardRows = fields
+    .slice(0, 6)
+    .map((field, index) => [cb(`Удалить: ${truncate(field.label, 20)}`, cbDraftFieldRemove(index))]);
+  rows.push([cb('Свой вопрос', CB.draftFieldAdd), cb('Конструктор в приложении', cbQuestionsApp('draft'))]);
+  rows.push([cb('Сохранить', CB.draftSkip)]);
+  return withKeyboard(lines.join('\n'), rows);
 };
 
 export const eventLinkText = (event: DosugEvent, linkUrl: string | null, code: string): string => {

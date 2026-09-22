@@ -1,6 +1,8 @@
 #!/bin/sh
 # Обратный SSH-туннель: VPS:127.0.0.1:8090 -> этот узел:127.0.0.1:8090.
 # Так публичный HTTPS (Cloudflare на VPS) доходит до бота, живущего за серым IP.
+# runit перезапускает процесс, если он упал; ExitOnForwardFailure заставляет выйти,
+# если на VPS порт занят (тогда следующая попытка через секунду).
 exec 2>&1
 
 if [ ! -f /home/user/.ssh/vps_tunnel ]; then
@@ -14,6 +16,7 @@ exec chpst -u user:user ssh -N \
   -o StrictHostKeyChecking=accept-new \
   -o UserKnownHostsFile=/home/user/.ssh/known_hosts \
   -o ExitOnForwardFailure=yes \
+  -o TCPKeepAlive=yes \
   -o ServerAliveInterval=20 \
   -o ServerAliveCountMax=3 \
   -i /home/user/.ssh/vps_tunnel \

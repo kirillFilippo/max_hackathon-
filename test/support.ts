@@ -14,7 +14,7 @@ import { migrate } from '../src/db/migrate.js';
 import { createDb, type Db } from '../src/db/pool.js';
 import { createRepositories, type Repositories } from '../src/db/repositories/index.js';
 import { PgSessionStore } from '../src/db/sessions.js';
-import { createLogger } from '../src/logger.js';
+import { createLogger, type Logger } from '../src/logger.js';
 import { EventService } from '../src/services/eventService.js';
 import { ItemService } from '../src/services/itemService.js';
 import { ParticipantService } from '../src/services/participantService.js';
@@ -65,6 +65,7 @@ export interface Harness {
   db: Db;
   repos: Repositories;
   config: AppConfig;
+  logger: Logger;
   deps: AppDeps;
   profiles: ProfileService;
   events: EventService;
@@ -140,6 +141,7 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
     db,
     repos,
     config,
+    logger,
     deps,
     profiles,
     events,

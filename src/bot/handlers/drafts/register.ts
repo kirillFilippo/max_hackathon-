@@ -2,7 +2,7 @@ import { formatDateTime } from '../../../domain/datetime.js';
 import { STATUS_LABELS, type DosugEvent, type ParticipantStatus } from '../../../domain/types.js';
 import { CB, cbEventCard, cbRegStatus, parseCallback } from '../../callbacks.js';
 import { validateAnswer } from '../../../domain/validation.js';
-import { replyTo, show, type BotContext } from '../../context.js';
+import { replyTo, show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, text, withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
@@ -358,7 +358,7 @@ export const handleRegisterDraft = async (
   const { action, args } = isCallback
     ? parseCallback(ctx.callback?.payload ?? '')
     : { action: '', args: [] as string[] };
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
 
   const event = await deps.events.findByCode(draft.data.eventCode);
   if (!event) {

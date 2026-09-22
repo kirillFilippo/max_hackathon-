@@ -2,7 +2,7 @@ import { DEFAULT_TIME, formatDateTime, parseLimit, parseUserDateTime } from '../
 import { addressWarning, normalizePlace } from '../../../domain/maps.js';
 import type { DraftState } from '../../session.js';
 import { CB, cbDraftTemplate, cbEventLink, parseCallback } from '../../callbacks.js';
-import { replyTo, show, type BotContext } from '../../context.js';
+import { replyTo, show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import {
   cancelRow,
@@ -14,7 +14,8 @@ import {
   type MessageContent,
 } from '../../message.js';
 import { createSummary, placeConfirm, placePrompt, organizerEventCard } from '../../texts/event.js';
-import { answerModeScreen, openQuestionsApp, renderFieldsScreen } from '../questions.js';
+import { renderFieldsScreen } from '../questions.js';
+import { handleFieldsScreenInput } from './fieldsScreen.js';
 import { eventViewOptions } from '../features/events.js';
 import { botUsernameOf, menuRow, userIdOf } from '../helpers.js';
 
@@ -157,7 +158,7 @@ export const handleCreateEventDraft = async (
   const { action, args } = isCallback
     ? parseCallback(ctx.callback?.payload ?? '')
     : { action: '', args: [] as string[] };
-  const input = ctx.message?.body.text?.trim() ?? '';
+  const input = userText(ctx);
 
   if (isCallback && action === 'draft' && args[0] === 'back') {
     draft.step = 'fields';
@@ -294,41 +295,28 @@ export const handleCreateEventDraft = async (
         draft.fields = [];
         draft.data.templateId = null;
         draft.step = 'fields';
-        // Вопросы собираются только в мини-приложении.
-        await openQuestionsApp(ctx, deps, draft);
+        // Экран вопросов: добавить свой, взять подсказку или собрать в приложении.
+        await renderFieldsScreen(ctx, deps, draft);
         return true;
       }
       draft.fields = await deps.templates.fieldsFor(templateId, userIdOf(ctx));
       draft.data.templateId = templateId;
       draft.step = 'fields';
-      await openQuestionsApp(ctx, deps, draft);
+      await renderFieldsScreen(ctx, deps, draft);
       return true;
     }
 
     case 'fields': {
-      // Вопросы собираются только в мини-приложении: в чате — вход в конструктор и способ ответа.
-      if (isCallback && action === 'app' && args[0] === 'questions') {
-        await openQuestionsApp(ctx, deps, draft);
+      // Пока открыт редактор вопроса, «Дальше» не должно срабатывать.
+      if (!draft.editor && isCallback && action === 'draft' && args[0] === 'skip') {
+        draft.step = 'save-template';
+        // Название могло прийти из конструктора вопросов — тогда не спрашиваем его заново.
+        await show(ctx, promptSaveTemplate(draft.data.saveTemplateName));
         return true;
       }
-      if (isCallback && action === 'q' && args[0] === 'mode') {
-        await show(ctx, answerModeScreen('draft', draft.fields, draft.data.answerMode ?? 'auto'));
-        return true;
-      }
-      if (isCallback && action === 'q' && args[0] === 'set') {
-        const requested = args[2];
-        if (requested === 'auto' || requested === 'chat' || requested === 'miniapp') {
-          draft.data.answerMode = requested;
-        }
-        await renderFieldsScreen(ctx, deps, draft);
-        return true;
-      }
-      if (isCallback && action === 'draft' && args[0] === 'skip') {
-        draft.step = 'confirm';
-        await show(ctx, createSummary(draft.data, draft.fields, eventViewOptions(ctx, deps)));
-        return true;
-      }
-      await renderFieldsScreen(ctx, deps, draft);
+      // Шаги редактора, добавление и удаление вопросов, вход в мини-приложение.
+      const handled = await handleFieldsScreenInput(ctx, deps, draft, action, args);
+      if (!handled) await renderFieldsScreen(ctx, deps, draft);
       return true;
     }
 

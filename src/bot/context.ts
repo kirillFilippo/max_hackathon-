@@ -34,6 +34,13 @@ export const setEditFailureReporter = (reporter: (error: unknown) => void): void
   editFailureReporter = reporter;
 };
 
+/**
+ * Текст, который ввёл пользователь. Для нажатий кнопок возвращает пустую строку:
+ * в обновлении с кнопкой тоже есть message, но там текст экрана, а не ответ.
+ */
+export const userText = (ctx: BotContext): string =>
+  ctx.updateType === 'message_created' ? (ctx.message?.body.text?.trim() ?? '') : '';
+
 export const targetOf = (ctx: BotContext): { chatId?: number; userId?: number } => ({
   chatId: ctx.chatId ?? undefined,
   userId: ctx.user?.user_id ?? undefined,
