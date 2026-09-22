@@ -1,0 +1,21 @@
+#!/bin/sh
+# Обратный SSH-туннель: VPS:127.0.0.1:8090 -> этот узел:127.0.0.1:8090.
+# Так публичный HTTPS (Cloudflare на VPS) доходит до бота, живущего за серым IP.
+exec 2>&1
+
+if [ ! -f /home/user/.ssh/vps_tunnel ]; then
+  echo "нет ключа /home/user/.ssh/vps_tunnel — сначала выполните scripts/setup-tunnel.sh"
+  sleep 300
+  exit 1
+fi
+
+exec chpst -u user:user ssh -N \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  -o UserKnownHostsFile=/home/user/.ssh/known_hosts \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=20 \
+  -o ServerAliveCountMax=3 \
+  -i /home/user/.ssh/vps_tunnel \
+  -R 127.0.0.1:8090:127.0.0.1:8090 \
+  root@193.233.18.174

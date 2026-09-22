@@ -1,0 +1,58 @@
+# Продакшн-стек домашнего узла: PostgreSQL + бот (один HTTP-порт на вебхук и мини-приложение).
+#
+# Запуск:  cd /opt/dosug-bot && docker compose -f deploy/compose.prod.yaml --env-file .env up -d --build
+# Обновление: docker compose -f deploy/compose.prod.yaml pull && docker compose -f deploy/compose.prod.yaml up -d
+#
+# Наружу порт не публикуется: его забирает обратный SSH-туннель на VPS (127.0.0.1:8090),
+# откуда трафик идёт в Cloudflare (minimax.zmeyka.dev).
+name: dosug
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dosug-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?задайте в .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте в .env}
+      POSTGRES_DB: ${POSTGRES_DB:?задайте в .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Ограничения под ноут: Postgres здесь ест больше всего, но 1 ГБ ему достаточно.
+    mem_limit: 1g
+    shm_size: 128m
+    restart: unless-stopped
+
+  bot:
+    # Локально собираем сами, в CI — тянем готовый образ из GHCR (BOT_IMAGE в .env).
+    image: ${BOT_IMAGE:-dosug-bot:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: dosug-bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ../.env
+    environment:
+      # Внутри compose база доступна по имени сервиса.
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATA_DIR: /app/data
+      MINIAPP_PORT: "8090"
+      # Сертификат MAX подхватывается при старте (NODE_EXTRA_CA_CERTS).
+      MAX_CA_CERT_PATH: /app/certs/russian-trusted-root-ca.pem
+    volumes:
+      - ../data:/app/data
+      - ../certs:/app/certs:ro
+    ports:
+      # Только локально: туннель ходит на 127.0.0.1:8090.
+      - "127.0.0.1:8090:8090"
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  dbdata:

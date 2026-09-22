@@ -1,0 +1,14 @@
+#!/bin/sh
+# Наблюдает за стеком бота: docker compose up в foreground, runit перезапускает при падении.
+exec 2>&1
+
+# Ждём, пока поднимется docker (после перезагрузки сервисы стартуют параллельно).
+i=0
+while [ "$i" -lt 60 ]; do
+  docker info >/dev/null 2>&1 && break
+  i=$((i + 1))
+  sleep 2
+done
+
+cd /opt/dosug-bot || exit 1
+exec docker compose -f deploy/compose.prod.yaml --env-file .env up --remove-orphans

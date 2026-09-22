@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pull-деплой: раз в 5 минут проверяет новый образ в реестре и перезапускает бота.
+# Так обновление не требует входящего доступа к домашнему узлу.
+exec 2>&1
+
+cd /opt/dosug-bot || exit 1
+# shellcheck disable=SC1091
+. ./.env 2>/dev/null || true
+IMAGE="${BOT_IMAGE:-dosug-bot:local}"
+
+while true; do
+  sleep 300
+  before=$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || echo none)
+  docker compose -f deploy/compose.prod.yaml --env-file .env pull --quiet bot >/dev/null 2>&1 || true
+  after=$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || echo none)
+  if [ "$before" != "$after" ]; then
+    echo "$(date -Is) образ обновился: $before -> $after, перезапускаю бота"
+    sv restart dosug-bot
+    docker image prune -f >/dev/null 2>&1 || true
+  fi
+done

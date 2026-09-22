@@ -1,0 +1,87 @@
+name: build
+
+# Сборка образа и публикация в GHCR. Домашний узел забирает готовый образ
+# (pull-деплой через runit-сервис dosug-updater), поэтому входящий доступ к нему не нужен.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/max-hackathon-bot
+
+jobs:
+  verify:
+    name: Проверки (типы, тесты, сборка)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Проверка типов
+        run: npm run typecheck
+
+      - name: Тесты (включая интеграционные на PostgreSQL)
+        run: npm test
+
+      - name: Сборка
+        run: npm run build
+
+  image:
+    name: Образ в GHCR
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Вход в GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Теги образа
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Сборка и публикация (amd64 + arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Что дальше
+        run: |
+          echo "Образ опубликован: ${{ env.IMAGE }}"
+          echo "На домашнем узле обновление подхватится сервисом dosug-updater (раз в 5 минут)."
+          echo "Обновить вручную:"
+          echo "  cd /opt/dosug-bot && docker compose -f deploy/compose.prod.yaml --env-file .env pull bot && sv restart dosug-bot"
