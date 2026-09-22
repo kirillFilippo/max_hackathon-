@@ -15,7 +15,8 @@
     "test": "node --import tsx --test --test-concurrency=1 test/*.test.ts",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
-    "docs:slides": "node scripts/build-slides.mjs"
+    "docs:slides": "node scripts/build-slides.mjs",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@maxhub/max-bot-api": "^0.3.1",
