@@ -35,7 +35,8 @@ export interface AppDeps {
 
 /** Мост «бот → мини-приложение»: ссылка для кнопки и приём сохранённых полей. */
 export interface MiniappBridge {
-  buildUrl: (ticket: string, fields: MiniappField[], answerMode: AnswerMode) => string;
+  /** Ссылка на конструктор: только одноразовая подпись, черновик страница берёт сама. */
+  buildUrl: (ticket: string) => string;
   registerTicket: (ticket: string, owner: { userId: number; at: number }) => void;
   takeTicket: (ticket: string) => { userId: number; at: number } | null;
 }

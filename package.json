@@ -16,7 +16,8 @@
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "docs:slides": "node scripts/build-slides.mjs",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:home": "bash scripts/deploy-home.sh"
   },
   "dependencies": {
     "@maxhub/max-bot-api": "^0.3.1",

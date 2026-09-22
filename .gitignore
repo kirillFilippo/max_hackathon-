@@ -14,3 +14,4 @@ npm-debug.log*
 certs/*.pem
 certs/*.crt
 .npm-cache/
+.deploy/

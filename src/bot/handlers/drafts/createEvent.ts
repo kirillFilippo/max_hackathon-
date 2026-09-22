@@ -60,8 +60,23 @@ const promptTemplate = async (deps: AppDeps, userId: number): Promise<MessageCon
   );
 };
 
-const promptSaveTemplate = (): MessageContent =>
-  withKeyboard(
+const promptSaveTemplate = (proposedName?: string | null): MessageContent => {
+  if (proposedName) {
+    return withKeyboard(
+      [
+        `Название набора: ${proposedName}`,
+        '',
+        'Сохранить его как шаблон для будущих событий?',
+        'Или отправьте другое название сообщением.',
+      ].join('\n'),
+      [
+        [cb(`Сохранить шаблон «${truncate(proposedName, 24)}»`, CB.draftSaveTemplate)],
+        [cb('Не сохранять', CB.draftSkip)],
+      ],
+    );
+  }
+
+  return withKeyboard(
     [
       'Сохранить эти вопросы как шаблон?',
       '',
@@ -70,6 +85,7 @@ const promptSaveTemplate = (): MessageContent =>
     ].join('\n'),
     [[cb('Не сохранять', CB.draftSkip)]],
   );
+};
 
 export const startCreateEvent = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
   if (!ctx.session) return;
@@ -317,13 +333,21 @@ export const handleCreateEventDraft = async (
     }
 
     case 'save-template': {
-      if (isCallback && args[0] === 'skip') {
+      if (isCallback && action === 'draft' && args[0] === 'savetpl' && args[1] === 'yes') {
+        const name = (draft.data.saveTemplateName ?? '').trim();
+        if (!name) {
+          await show(ctx, promptSaveTemplate(null));
+          return true;
+        }
+        const template = await deps.templates.createFromFields(userIdOf(ctx), name.slice(0, 60), draft.fields);
+        draft.data.saveTemplateName = template.name;
+      } else if (isCallback && args[0] === 'skip') {
         draft.data.saveTemplateName = null;
       } else if (input) {
         const template = await deps.templates.createFromFields(userIdOf(ctx), input.slice(0, 60), draft.fields);
         draft.data.saveTemplateName = template.name;
       } else {
-        await show(ctx, promptSaveTemplate());
+        await show(ctx, promptSaveTemplate(draft.data.saveTemplateName));
         return true;
       }
       draft.step = 'confirm';

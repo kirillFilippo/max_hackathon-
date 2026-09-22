@@ -1,12 +1,13 @@
 import type { Bot } from '@maxhub/max-bot-api';
 import { session } from '@maxhub/max-bot-api';
 
-import { show } from '../context.js';
+import { setEditFailureReporter, show } from '../context.js';
 import type { BotContext } from '../context.js';
 import type { PgSessionStore } from '../../db/sessions.js';
 import type { AppDeps } from '../deps.js';
 import { cb, withKeyboard } from '../message.js';
 import type { BotSession } from '../session.js';
+import { UpdateDeduplicator, dedupeMiddleware } from '../middleware/dedupe.js';
 import { withErrorHandling } from './helpers.js';
 import { handleCallback } from './routers/callbackRouter.js';
 import { handleDraft } from './routers/draftRouter.js';
@@ -24,6 +25,14 @@ export const registerHandlers = (
   deps: AppDeps,
   sessionStore: PgSessionStore<BotSession>,
 ): void => {
+  // Самая первая проверка: не обрабатываем одно и то же действие дважды —
+  // иначе двойное нажатие прогоняет несколько шагов мастера и шлёт пачку сообщений.
+  bot.use(dedupeMiddleware(new UpdateDeduplicator(deps.logger.child('dedupe'))));
+
+  // Диагностика «лишних» сообщений: если редактирование не прошло, пишем в лог.
+  setEditFailureReporter((error) =>
+    deps.logger.warn('Не удалось изменить сообщение, отправляю новое', error));
+
   bot.use(
     session<BotSession, BotContext>({
       store: sessionStore,

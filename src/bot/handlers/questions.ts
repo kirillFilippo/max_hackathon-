@@ -72,22 +72,8 @@ export const openQuestionsApp = async (
 
   const ticket = newTicket();
   deps.miniapp.registerTicket(ticket, { userId: userIdOf(ctx), at: Date.now() });
-  const url = deps.miniapp.buildUrl(
-    ticket,
-    host.fields.map((field) => ({
-      label: field.label,
-      type: field.type,
-      options: field.options,
-      multiple: field.multiple,
-      minSelected: field.minSelected,
-      maxSelected: field.maxSelected,
-      min: field.min,
-      max: field.max,
-      maxLength: field.maxLength,
-      required: field.required,
-    })),
-    host.data?.answerMode ?? 'auto',
-  );
+  // В ссылке только подпись: черновик вопросов страница забирает сама.
+  const url = deps.miniapp.buildUrl(ticket);
 
   await show(
     ctx,
@@ -96,7 +82,7 @@ export const openQuestionsApp = async (
         'Конструктор вопросов',
         '',
         'Откройте мини-приложение, соберите вопросы списком и нажмите «Сохранить в бота».',
-        'Ограничения ответов (границы числа, длина текста, число вариантов) задаются там же.',
+        'Там же задаются ограничения ответов и название набора для шаблона.',
         'После сохранения вернитесь в чат — вопросы появятся на этом экране.',
       ].join('\n'),
       [[button.openApp('Открыть конструктор', url)], [cb('Вернуться к вопросам', CB.draftSkip)]],

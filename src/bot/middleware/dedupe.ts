@@ -1,0 +1,145 @@
+import type { MiddlewareFn } from '@maxhub/max-bot-api';
+
+import type { BotContext } from '../context.js';
+import type { Logger } from '../../logger.js';
+
+/**
+ * Защита от повторной обработки одного и того же действия.
+ *
+ * Почему это нужно: платформа может доставить обновление повторно (переподключение
+ * long polling, рестарт бота), а пользователь — успеть нажать кнопку дважды, пока
+ * предыдущий шаг ещё обрабатывается. Без защиты один и тот же шаг мастера
+ * выполняется несколько раз: бот пропускает шаги и присылает несколько сообщений.
+ *
+ * Два ключа:
+ *  - точный (`update_type:timestamp:message:payload`) — ловит повторную доставку
+ *    того же самого обновления;
+ *  - смысловой (`user:message:payload`) — ловит двойное нажатие одной и той же
+ *    кнопки в одном и том же сообщении. Живёт недолго, чтобы осознанное повторное
+ *    нажатие через полминуты (например, «Обновить») снова работало.
+ */
+/**
+ * Действия, которые повторяют осознанно и в том же сообщении: снять галочку в
+ * мультивыборе, обновить список. Их защищаем только от точной повторной доставки,
+ * но не от повторного нажатия — иначе «отменить выбор» не сработает.
+ */
+const REPEATABLE_PAYLOADS: RegExp[] = [
+  /^reg:toggle:/,
+  /^ev:people:/,
+  /^shop:show/,
+  /^shop:mine/,
+  /^money:show/,
+  /^tq:refresh/,
+];
+
+export const isRepeatableAction = (payload: string): boolean =>
+  REPEATABLE_PAYLOADS.some((pattern) => pattern.test(payload));
+
+export interface DedupeOptions {
+  /** Сколько помнить точные обновления (повторная доставка). */
+  exactTtlMs?: number;
+  /** Сколько помнить смысловые нажатия (двойной тап). */
+  actionTtlMs?: number;
+  /** Предел записей, чтобы память не росла. */
+  maxEntries?: number;
+}
+
+interface SlimUpdate {
+  update_type?: string;
+  timestamp?: number;
+  message?: { body?: { mid?: string } | null } | null;
+  callback?: { payload?: string | null } | null;
+  user?: { user_id?: number } | null;
+}
+
+export class UpdateDeduplicator {
+  private readonly seen = new Map<string, number>();
+
+  constructor(
+    private readonly logger: Logger,
+    private readonly options: DedupeOptions = {},
+  ) {}
+
+  private get exactTtl(): number {
+    return this.options.exactTtlMs ?? 5 * 60 * 1000;
+  }
+
+  private get actionTtl(): number {
+    return this.options.actionTtlMs ?? 20 * 1000;
+  }
+
+  private get maxEntries(): number {
+    return this.options.maxEntries ?? 5000;
+  }
+
+  /** Возвращает true, если это обновление уже обрабатывали и его надо пропустить. */
+  isDuplicate(ctx: BotContext): boolean {
+    const update = ctx.update as unknown as SlimUpdate;
+    const type = update.update_type ?? 'unknown';
+    const mid = update.message?.body?.mid ?? '';
+    const payload = update.callback?.payload ?? '';
+    const userId = update.user?.user_id ?? ctx.user?.user_id ?? 0;
+    const now = Date.now();
+
+    this.evict(now);
+
+    const exactKey = `e:${type}:${update.timestamp ?? 0}:${mid}:${payload}`;
+    const exactDuplicate = this.touch(exactKey, now, this.exactTtl);
+
+    // Смысловой ключ только для кнопок: у текстовых сообщений mid уникален.
+    // Повторяемые действия (мультивыбор, обновление) под него не попадают.
+    let actionDuplicate = false;
+    if (type === 'message_callback' && mid && !isRepeatableAction(payload)) {
+      actionDuplicate = this.touch(`a:${userId}:${mid}:${payload}`, now, this.actionTtl);
+    }
+
+    this.trim();
+
+    if (exactDuplicate) {
+      this.logger.debug(`Пропускаю повторно доставленное обновление ${type}`);
+      return true;
+    }
+    if (actionDuplicate) {
+      this.logger.debug(`Пропускаю повторное нажатие кнопки ${payload}`);
+      return true;
+    }
+    return false;
+  }
+
+  private touch(key: string, now: number, ttlMs: number): boolean {
+    const seenAt = this.seen.get(key);
+    if (seenAt !== undefined && now - seenAt < ttlMs) return true;
+    // Перезаписываем время: запись живёт от последнего обращения.
+    this.seen.delete(key);
+    this.seen.set(key, now);
+    return false;
+  }
+
+  private evict(now: number): void {
+    for (const [key, seenAt] of this.seen) {
+      const ttl = key.startsWith('a:') ? this.actionTtl : this.exactTtl;
+      if (now - seenAt >= ttl) this.seen.delete(key);
+    }
+  }
+
+  /** Память не должна расти: храним не больше maxEntries самых свежих записей. */
+  private trim(): void {
+    while (this.seen.size > this.maxEntries) {
+      const oldest = this.seen.keys().next();
+      if (oldest.done) break;
+      this.seen.delete(oldest.value);
+    }
+  }
+
+  /** Размер карты — нужно тестам и диагностике. */
+  get size(): number {
+    return this.seen.size;
+  }
+}
+
+export const dedupeMiddleware = (deduplicator: UpdateDeduplicator): MiddlewareFn<BotContext> => {
+  return async (ctx, next) => {
+    if (deduplicator.isDuplicate(ctx)) return undefined;
+    return next();
+  };
+};

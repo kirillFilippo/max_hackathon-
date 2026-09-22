@@ -28,6 +28,7 @@ export const CB = {
 
   draftCancel: 'draft:cancel',
   draftSkip: 'draft:skip',
+  draftSaveTemplate: 'draft:savetpl:yes',
   draftBack: 'draft:back',
   draftPublish: 'draft:publish',
   draftFieldAdd: 'draft:field:add',

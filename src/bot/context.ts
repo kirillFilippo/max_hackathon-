@@ -23,6 +23,17 @@ export const contentToExtra = (content: MessageContent, extra: SendExtra = {}): 
   return payload;
 };
 
+/**
+ * Редактирование сообщения может не пройти (сообщение удалено, устарело).
+ * Тогда мы отправляем новое — но об этом стоит знать в логах: именно такие
+ * случаи выглядят как «бот прислал два сообщения».
+ */
+let editFailureReporter: ((error: unknown) => void) | null = null;
+
+export const setEditFailureReporter = (reporter: (error: unknown) => void): void => {
+  editFailureReporter = reporter;
+};
+
 export const targetOf = (ctx: BotContext): { chatId?: number; userId?: number } => ({
   chatId: ctx.chatId ?? undefined,
   userId: ctx.user?.user_id ?? undefined,
@@ -85,8 +96,10 @@ export const show = async (
       });
       await answerCallback(ctx);
       return;
-    } catch {
-      // Сообщение могло быть удалено или слишком старое — отправляем новое.
+    } catch (error) {
+      // Сообщение могло быть удалено или слишком старое — отправляем новое,
+      // но фиксируем причину: из-за этого в чате появляется лишнее сообщение.
+      editFailureReporter?.(error);
     }
   }
   await replyTo(ctx, content, extra as SendExtra);

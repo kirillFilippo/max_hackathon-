@@ -52,6 +52,13 @@ export interface AnswerSubmission {
 
 export type AnswerSaveResult = { ok: true } | { ok: false; error: string; fieldId?: string };
 
+/** Черновик вопросов организатора, который конструктор подтягивает по подписи. */
+export interface MiniappDraft {
+  fields: MiniappField[];
+  answerMode: AnswerMode;
+  name: string;
+}
+
 export interface MiniappDeps {
   /**
    * Путь вебхука MAX (например, /max/webhook). Если задан вместе с webhookHandler,
@@ -73,17 +80,28 @@ export interface MiniappDeps {
   saveAnswers: (submission: AnswerSubmission) => Promise<AnswerSaveResult>;
   /** Проверяет одноразовую подпись мастера (или null, если она истекла/неизвестна). */
   takeTicket: (ticket: string) => MiniappTicket | null;
-  /** Вызывается после успешного сохранения: подпись гасится. */
+  /** Подпись живёт ограниченное время и допускает повторные сохранения. */
   consumeTicket?: (ticket: string) => void;
+  /** Текущий черновик организатора: его конструктор подтягивает по подписи. */
+  getDraft: (userId: number) => Promise<MiniappDraft | null>;
   /** Вызывается ботом: сохранить поля в черновик организатора и обновить сообщение. */
-  onFieldsSaved: (userId: number, fields: MiniappField[], answerMode: AnswerMode) => Promise<void>;
+  onFieldsSaved: (
+    userId: number,
+    fields: MiniappField[],
+    answerMode: AnswerMode,
+    name: string,
+  ) => Promise<void>;
 }
 
 export interface MiniappHandle {
   url: string;
   port: number;
-  /** Ссылка для кнопки open_app: страница конструктора с подписью и текущими полями. */
-  buildUrl: (ticket: string, fields: MiniappField[], answerMode: AnswerMode) => string;
+  /**
+   * Ссылка для кнопки open_app: только одноразовая подпись. Черновик страница
+   * забирает сама (GET /app/draft), поэтому URL короткий и не ломается
+   * на длинных анкетах.
+   */
+  buildUrl: (ticket: string) => string;
   registerTicket: (ticket: string, owner: MiniappTicket) => void;
   close: () => Promise<void>;
 }
@@ -200,6 +218,24 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/app/questions')) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(renderMiniappHtml({ title: 'Вопросы участникам' }));
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/app/draft') {
+        // Черновик вопросов отдаём по подписи: URL конструктора остаётся коротким,
+        // а повторное открытие не теряет уже собранные вопросы.
+        const ticketValue = url.searchParams.get('t') ?? '';
+        const ticket = ticketValue ? deps.takeTicket(ticketValue) : null;
+        if (!ticket) {
+          json(res, 403, { error: 'Ссылка конструктора устарела. Откройте её заново из чата с ботом.' });
+          return;
+        }
+        const draft = await deps.getDraft(ticket.userId);
+        if (!draft) {
+          json(res, 404, { error: 'Черновик не найден. Откройте конструктор из мастера создания события.' });
+          return;
+        }
+        json(res, 200, draft);
         return;
       }
 
@@ -331,9 +367,10 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
         }
 
         const answerMode = sanitizeAnswerMode(parsed.answerMode);
+        const name = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 60) : '';
         try {
-          await deps.onFieldsSaved(ticket.userId, fields, answerMode);
-          deps.consumeTicket?.(ticketValue);
+          // Подпись не гасим: организатор может сохранить ещё раз, пока она жива.
+          await deps.onFieldsSaved(ticket.userId, fields, answerMode, name);
         } catch (saveError) {
           deps.logger.error('Не удалось сохранить вопросы из мини-приложения', saveError);
           json(res, 500, { error: 'Не удалось сохранить вопросы, попробуйте ещё раз' });
@@ -369,9 +406,8 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
   return {
     url: baseUrl,
     port,
-    buildUrl: (ticket: string, fields: MiniappField[], answerMode: AnswerMode) => {
-      const payload = Buffer.from(JSON.stringify(fields), 'utf8').toString('base64');
-      const params = new URLSearchParams({ t: ticket, d: payload, m: answerMode });
+    buildUrl: (ticket: string) => {
+      const params = new URLSearchParams({ t: ticket });
       return `${baseUrl}/app/questions?${params.toString()}`;
     },
     registerTicket: (ticket: string, owner: MiniappTicket) => {

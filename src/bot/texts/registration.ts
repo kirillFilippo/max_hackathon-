@@ -103,7 +103,7 @@ const fieldHint = (field: EventField): string => {
     case 'date':
       return 'Отправьте дату в формате ДД.ММ.ГГГГ, например 25.10.2026.';
     case 'text':
-      return `Отправьте ответ сообщением${field.maxLength === null ? '' : ` (до ${field.maxLength} символов)`}.`;
+      return `Отправьте ответ сообщением${field.maxLength === null ? '' : `, до ${field.maxLength} символов`}.`;
     case 'choice':
       return field.multiple
         ? 'Отметьте нужные варианты кнопками и нажмите «Готово».'

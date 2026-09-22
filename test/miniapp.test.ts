@@ -14,7 +14,23 @@ interface SavedPayload {
   userId: number;
   fields: MiniappField[];
   answerMode: AnswerMode;
+  name: string;
 }
+
+const draftFields: MiniappField[] = [
+  {
+    label: 'Возраст',
+    type: 'number',
+    options: [],
+    multiple: false,
+    minSelected: null,
+    maxSelected: null,
+    min: 6,
+    max: 99,
+    maxLength: null,
+    required: true,
+  },
+];
 
 let handle: MiniappHandle;
 let saved: SavedPayload[] = [];
@@ -28,6 +44,9 @@ before(async () => {
     port: 0,
     botToken: 'test-bot-token',
     devMode: true,
+    getDraft: async (userId) => (userId === 7
+      ? { fields: draftFields, answerMode: 'chat', name: 'Настольная игра' }
+      : null),
     getQuestionnaire: async (code) => (code === 'ABC12'
       ? {
           event: { code: 'ABC12', title: 'Настолки', startsAt: '25 октября 2026, 19:00', place: 'Кубик' },
@@ -47,8 +66,8 @@ before(async () => {
     consumeTicket: (ticket) => {
       validTickets.delete(ticket);
     },
-    onFieldsSaved: async (userId, fields, answerMode) => {
-      saved.push({ userId, fields, answerMode });
+    onFieldsSaved: async (userId, fields, answerMode, name) => {
+      saved.push({ userId, fields, answerMode, name });
     },
   });
 });
@@ -76,6 +95,11 @@ describe('Мини-приложение конструктора вопросо�
     for (const capability of ['Число', 'Дата', 'Максимум', 'Максимальная длина', 'Можно выбрать несколько']) {
       assert.match(html, new RegExp(capability));
     }
+    // Название набора для шаблона — прямо в конструкторе.
+    assert.match(html, /Название набора/);
+    assert.match(html, /id="name"/);
+    // Черновик страница забирает по подписи, а не из base64 в URL.
+    assert.match(html, /app\/draft\?t=/);
     // Настройка способа ответа спрятана в свёрнутый блок, но доступна организатору.
     assert.match(html, /<details class="mode">/);
     assert.match(html, /Способ ответа участников/);
@@ -92,6 +116,7 @@ describe('Мини-приложение конструктора вопросо�
     const { status, data } = await post({
       ticket,
       answerMode: 'miniapp',
+      name: 'Поход в леса',
       fields: [
         { label: '  Возраст  ', type: 'number', min: '6', max: '99', required: true },
         { label: 'Дата заезда', type: 'date', required: true },
@@ -112,6 +137,7 @@ describe('Мини-приложение конструктора вопросо�
     assert.equal(saved.length, 1);
     assert.equal(saved[0]?.userId, 7);
     assert.equal(saved[0]?.answerMode, 'miniapp');
+    assert.equal(saved[0]?.name, 'Поход в леса');
 
     const fields = saved[0]!.fields;
     assert.equal(fields.length, 4);
@@ -130,7 +156,7 @@ describe('Мини-приложение конструктора вопросо�
     assert.equal(fields[3]?.required, false);
   });
 
-  it('отклоняет одноразовый тикет повторно и не пускает без тикета', async () => {
+  it('разрешает сохранять повторно по той же подписи и не пускает без неё', async () => {
     const ticket = newTicket();
     validTickets.set(ticket, Date.now());
 
@@ -140,15 +166,37 @@ describe('Мини-приложение конструктора вопросо�
     });
     assert.equal(first.status, 200);
 
-    // Тот же тикет второй раз уже недействителен: он одноразовый.
+    // Повторное сохранение — обычный сценарий: поправил вопросы и сохранил снова.
     const second = await post({
       ticket,
       fields: [{ label: 'Вопрос', type: 'text', required: true }],
     });
-    assert.equal(second.status, 403);
+    assert.equal(second.status, 200);
 
     const withoutTicket = await post({ fields: [{ label: 'Вопрос', type: 'text' }] });
     assert.equal(withoutTicket.status, 403);
+  });
+
+  it('отдаёт черновик организатору по подписи', async () => {
+    const ticket = newTicket();
+    validTickets.set(ticket, Date.now());
+
+    const response = await fetch(
+      `http://127.0.0.1:${handle.port}/app/draft?t=${encodeURIComponent(ticket)}`,
+    );
+    const data = (await response.json()) as {
+      fields?: Array<{ label?: string }>;
+      answerMode?: string;
+      name?: string;
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(data.fields?.[0]?.label, 'Возраст');
+    assert.equal(data.answerMode, 'chat');
+    assert.equal(data.name, 'Настольная игра');
+
+    const stale = await fetch(`http://127.0.0.1:${handle.port}/app/draft?t=unknown`);
+    assert.equal(stale.status, 403);
   });
 
   it('валидирует присланные вопросы', async () => {
@@ -246,6 +294,7 @@ describe('Анкета участника в мини-приложении', () 
       devMode: true,
       takeTicket: () => null,
       onFieldsSaved: async () => undefined,
+      getDraft: async () => null,
       getQuestionnaire: async () => null,
       saveAnswers: async () => ({ ok: false, error: 'Слишком много: максимум 99.', fieldId: 'f-age' }),
     });
