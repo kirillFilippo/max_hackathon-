@@ -7,6 +7,11 @@ import { registerHandlers } from './bot/handlers/index.js';
 import { createApiNotifier } from './bot/notifier.js';
 import type { BotSession } from './bot/session.js';
 import { runReminderTick, type ReminderRunResult } from './bot/reminderRunner.js';
+import {
+  ensureSubscription,
+  startSubscriptionWatchdog,
+  type WatchdogHandle,
+} from './bot/subscriptionWatchdog.js';
 import { assertRunnableConfig, type AppConfig } from './config.js';
 import { migrate } from './db/migrate.js';
 import { createDb, type Db } from './db/pool.js';
@@ -228,6 +233,8 @@ export const createApp = async (
 
   let tickTimer: NodeJS.Timeout | null = null;
   let ticking = false;
+  /** Проверка живости подписки на вебхук: MAX теряет её при обрыве связи. */
+  let webhookWatchdog: WatchdogHandle | null = null;
 
   const tick = async (now: Date = new Date()): Promise<ReminderRunResult> => {
     const empty: ReminderRunResult = { confirmSent: 0, finalSent: 0, closed: 0, errors: 0 };
@@ -279,13 +286,18 @@ export const createApp = async (
       } catch (error) {
         logger.warn('Не удалось очистить прежние подписки', error);
       }
-      try {
-        await bot.api.subscribe(subscriptionUrl, config.webhookSecret);
-        logger.info(`Подписка на ${subscriptionUrl} активна`);
-      } catch (error) {
-        logger.error('Не удалось подписаться на вебхук', error);
-        throw error;
+
+      const state = await ensureSubscription({
+        api: bot.api,
+        logger,
+        url: subscriptionUrl,
+        secret: config.webhookSecret,
+      });
+      if (state === 'failed') {
+        // Связи нет — контейнер перезапустится (runit/compose) и попробует снова.
+        throw new Error(`Не удалось подписаться на вебхук ${subscriptionUrl}`);
       }
+      logger.info(`Подписка на ${subscriptionUrl} активна`);
 
       if (miniapp) {
         logger.info(`Webhook обслуживает сервер мини-приложения на порту ${miniapp.port}`);
@@ -298,7 +310,25 @@ export const createApp = async (
         ownWebhookServer = server;
         logger.info(`Webhook слушает порт ${config.webhookPort}`);
       }
+
+      // Домашний интернет рвётся: следим, что MAX по-прежнему шлёт обновления нам.
+      webhookWatchdog = startSubscriptionWatchdog({
+        api: bot.api,
+        logger,
+        url: subscriptionUrl,
+        secret: config.webhookSecret,
+        intervalMs: config.webhookCheckSeconds * 1000,
+      });
+      logger.info(`Проверка подписки каждые ${config.webhookCheckSeconds} с`);
     } else {
+      // В long polling подписка на вебхук только мешает: MAX доставлял бы
+      // обновления на старый адрес, а не в опрос. Снимаем её.
+      try {
+        await Webhook.clearSubscriptions(bot.api);
+        logger.info('Подписки на вебхук сняты: обновления получаем long polling');
+      } catch (error) {
+        logger.warn('Не удалось снять подписки на вебхук', error);
+      }
       void bot.startPolling({ retry: true }).catch((error: unknown) => {
         logger.error('Long polling остановлен с ошибкой', error);
         if (isCertificateError(error)) logger.error(certificateHint());
@@ -315,6 +345,8 @@ export const createApp = async (
       clearInterval(tickTimer);
       tickTimer = null;
     }
+    webhookWatchdog?.stop();
+    webhookWatchdog = null;
     bot.stopPolling();
     try {
       await bot.stopWebhook();
