@@ -1,7 +1,6 @@
 import {
   ANSWER_MODE_LABELS,
   EFFECTIVE_MODE_LABELS,
-  questionnaireWeight,
   resolveAnswerMode,
 } from '../../domain/questionnaire.js';
 import type { AnswerMode } from '../../domain/types.js';
@@ -97,7 +96,6 @@ export const answerModeScreen = (
   fields: QuestionsHost['fields'],
   mode: AnswerMode,
 ): MessageContent => {
-  const weight = questionnaireWeight(fields);
   const effective = resolveAnswerMode(fields, mode);
   const labels: Record<AnswerMode, string> = {
     auto: ANSWER_MODE_LABELS.auto,
@@ -118,10 +116,10 @@ export const answerModeScreen = (
     [
       'Способ ответа на анкету',
       '',
-      `Вес вопросов: ${weight}, порог 10.`,
       `Сейчас участники отвечают ${EFFECTIVE_MODE_LABELS[effective]}.`,
       '',
-      'По умолчанию бот выбирает способ по весу вопросов, но можно задать вручную.',
+      'По умолчанию бот решает сам: короткую анкету спрашивает в чате, длинную — '
+        + 'в приложении. Можно задать вручную.',
     ].join('\n'),
     rows,
   );

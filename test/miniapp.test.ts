@@ -103,7 +103,9 @@ describe('Мини-приложение конструктора вопросо�
     // Настройка способа ответа спрятана в свёрнутый блок, но доступна организатору.
     assert.match(html, /<details class="mode">/);
     assert.match(html, /Способ ответа участников/);
-    assert.match(html, /Автоматически по весу вопросов/);
+    assert.match(html, /Автоматически/);
+    // Внутренний вес анкеты в интерфейсе не показываем.
+    assert.doesNotMatch(html, /Вес вопросов|порог 10/i);
     assert.match(html, new RegExp(String(MINIAPP_CHAT_WEIGHT_LIMIT)));
     assert.match(html, /https:\/\/st\.max\.ru\/js\/max-web-app\.js|WebApp/);
     // Подпись мастера приходит и ссылкой мини-приложения (start_param), и через ?t=.

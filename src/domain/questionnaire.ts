@@ -41,7 +41,7 @@ export const resolveAnswerMode = (
 };
 
 export const ANSWER_MODE_LABELS: Record<AnswerMode, string> = {
-  auto: 'Автоматически по весу вопросов',
+  auto: 'Автоматически',
   chat: 'Всегда в чате',
   miniapp: 'Всегда в мини-приложении',
 };
@@ -49,16 +49,6 @@ export const ANSWER_MODE_LABELS: Record<AnswerMode, string> = {
 export const EFFECTIVE_MODE_LABELS: Record<EffectiveAnswerMode, string> = {
   chat: 'в чате',
   miniapp: 'в мини-приложении',
-};
-
-export const answerModeHint = (fields: EventField[], mode: AnswerMode): string => {
-  const weight = questionnaireWeight(fields);
-  const effective = resolveAnswerMode(fields, mode);
-  const reason =
-    mode === 'auto'
-      ? `вес вопросов ${weight}, порог ${CHAT_WEIGHT_LIMIT}`
-      : 'выбрано вручную';
-  return `Анкета: ${EFFECTIVE_MODE_LABELS[effective]} (${reason})`;
 };
 
 /** Приводит поле из БД к актуальному виду: старые записи не знают о новых полях. */

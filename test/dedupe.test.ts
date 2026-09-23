@@ -72,6 +72,19 @@ describe('Защита от повторной обработки действи
     assert.equal(dedupe.isDuplicate(ctxOf(callback('ev:people:A7K2Q', 'mid-5', 5000))), false);
   });
 
+  it('разрешает осознанно повторить шаг на том же экране', async () => {
+    // Окна короткие, как в жизни: двойной тап приходит за доли секунды.
+    const dedupe = new UpdateDeduplicator(silent, { sameScreenMs: 20, sameActionCooldownMs: 20 });
+
+    assert.equal(dedupe.isDuplicate(ctxOf(callback('draft:field:add', 'mid-9', 1000))), false);
+    // Двойной тап по той же кнопке на том же экране — пропускаем.
+    assert.equal(dedupe.isDuplicate(ctxOf(callback('draft:field:add', 'mid-9', 1010))), true);
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    // Осознанный повтор того же шага (второй вопрос с тем же текстом) — снова работает.
+    assert.equal(dedupe.isDuplicate(ctxOf(callback('draft:field:add', 'mid-9', 1020))), false);
+  });
+
   it('обычные текстовые сообщения не считаются дублями', () => {
     const dedupe = new UpdateDeduplicator(silent);
     assert.equal(dedupe.isDuplicate(ctxOf(message('msg-1', 1000))), false);

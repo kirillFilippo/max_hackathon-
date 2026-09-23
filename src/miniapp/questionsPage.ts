@@ -85,7 +85,7 @@ export const renderMiniappHtml = (options: { title: string }): string => `<!DOCT
 
 <details class="mode">
   <summary>Способ ответа участников</summary>
-  <div class="radio"><input type="radio" name="mode" id="mode-auto" value="auto"><label for="mode-auto" style="margin:0">Автоматически по весу вопросов</label></div>
+  <div class="radio"><input type="radio" name="mode" id="mode-auto" value="auto"><label for="mode-auto" style="margin:0">Автоматически</label></div>
   <div class="radio"><input type="radio" name="mode" id="mode-chat" value="chat"><label for="mode-chat" style="margin:0">Всегда в чате</label></div>
   <div class="radio"><input type="radio" name="mode" id="mode-miniapp" value="miniapp"><label for="mode-miniapp" style="margin:0">Всегда в мини-приложении</label></div>
 </details>
@@ -189,10 +189,13 @@ const numberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+// Как участники будут отвечать. Внутреннюю «тяжесть» анкеты показывать не нужно:
+// организатору важен результат, а не формула.
 const renderWeight = () => {
   const mode = effectiveMode();
-  weightEl.innerHTML = 'Вес вопросов: <b>' + totalWeight() + '</b> (порог ' + CHAT_LIMIT + ') — ' +
-    (mode === 'chat' ? 'участники отвечают в чате' : 'участники отвечают в мини-приложении');
+  weightEl.textContent = mode === 'chat'
+    ? 'Участники будут отвечать в чате'
+    : 'Участники будут отвечать в приложении';
   document.getElementById('mode-' + answerMode).checked = true;
 };
 

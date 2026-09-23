@@ -44,6 +44,8 @@ export interface DedupeOptions {
   actionTtlMs?: number;
   /** Сколько помнить вход в бота: `bot_started` и `/start` — одно действие. */
   startTtlMs?: number;
+  /** Сколько считать повтор нажатия на том же экране двойным тапом. */
+  sameScreenMs?: number;
   /**
    * Короткое окно «то же действие»: два нажатия одной кнопки подряд быстрее этого
    * времени считаем двойным тапом, даже если экран уже сменился. Живой человек
@@ -110,8 +112,17 @@ export class UpdateDeduplicator {
     return this.options.sameActionCooldownMs ?? 250;
   }
 
+  /**
+   * Окно «тот же экран — двойной тап». Намеренно короткое: настоящий двойной тап
+   * приходит за доли секунды, а осознанно повторить шаг можно и за секунду
+   * (например, «Пропустить» на одном и том же экране у двух вопросов подряд).
+   */
+  private get sameScreenWindow(): number {
+    return this.options.sameScreenMs ?? 1000;
+  }
+
   private get startTtl(): number {
-    return this.options.startTtlMs ?? 20 * 1000;
+    return this.options.startTtlMs ?? 8 * 1000;
   }
 
   private get maxEntries(): number {
@@ -146,8 +157,11 @@ export class UpdateDeduplicator {
     if (type === 'message_callback' && mid && !isRepeatableAction(payload)) {
       const actionKey = `a:${userId}:${mid}:${payload}`;
       const screen = screenFingerprint(update.message);
-      // Тот же экран — двойной тап (даже если он пришёл позже).
-      const sameScreen = this.seen.get(`${actionKey}:${screen}`) !== undefined;
+      // Тот же экран и почти то же время — двойной тап. Окно короткое: шаг можно
+      // осознанно повторить, вернувшись на такой же экран (список вопросов,
+      // «Пропустить» у второго вопроса с тем же текстом).
+      const sameScreenAt = this.seen.get(`${actionKey}:${screen}`) ?? 0;
+      const sameScreen = now - sameScreenAt < this.sameScreenWindow;
       // Другой экран, но подряд быстрее кулдауна — тоже двойной тап.
       const tooFast = now - (this.seen.get(`${actionKey}:last`) ?? 0) < this.sameActionCooldown;
       actionDuplicate = sameScreen || tooFast;

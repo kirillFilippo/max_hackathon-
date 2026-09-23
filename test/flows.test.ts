@@ -158,7 +158,8 @@ describe('Мастера: вопросы в создании события', ()
     await harness.click('q:mode:draft');
     noErrors();
     assert.match(harness.lastText(), /Способ ответа на анкету/);
-    assert.match(harness.lastText(), /Вес вопросов/);
+    // Внутренний «вес» анкеты организатору не показываем.
+    assert.doesNotMatch(harness.lastText(), /вес|порог/i);
 
     // Возврат не должен проматывать мастер вперёд.
     await harness.click('q:back:draft');
@@ -322,6 +323,79 @@ describe('Вопросы: выбор готового набора и кнопк
     await harness.click(templateId ? `draft:template:${templateId}` : 'draft:template:own');
     noErrors();
   };
+
+  it('позволяет добавлять вопросы по одному сколько нужно', async () => {
+    await gotoFields();
+
+    // Два вопроса подряд проходят одни и те же шаги: текст → тип → длина → обязательность.
+    for (const label of ['Первый вопрос', 'Второй вопрос']) {
+      await harness.click('draft:field:add');
+      await harness.sendText(label);
+      await harness.click('draft:fieldtype:text');
+      await harness.click('draft:editorskip');
+      await harness.click('draft:fieldreq:yes');
+      noErrors();
+    }
+
+    const list = harness.lastText();
+    assert.match(list, /1\. Первый вопрос/);
+    assert.match(list, /2\. Второй вопрос/);
+  });
+
+  it('не блокирует одинаковые шаги, когда текст вопросов совпадает', async () => {
+    await gotoFields();
+
+    // Одинаковые подписи дают одинаковые экраны редактора — повтор шага должен работать.
+    for (let index = 0; index < 2; index += 1) {
+      await harness.click('draft:field:add');
+      await harness.sendText('Один и тот же вопрос');
+      await harness.click('draft:fieldtype:yesno');
+      await harness.click('draft:fieldreq:yes');
+      noErrors();
+    }
+
+    assert.match(harness.lastText(), /2\. Один и тот же вопрос/);
+  });
+
+  it('позволяет удалить несколько вопросов подряд', async () => {
+    await gotoFields();
+
+    for (const label of ['Первый', 'Второй']) {
+      await harness.click('draft:field:add');
+      await harness.sendText(label);
+      await harness.click('draft:fieldtype:yesno');
+      await harness.click('draft:fieldreq:yes');
+      noErrors();
+    }
+
+    // Удаляем первый, затем — снова первый (бывший второй).
+    await harness.click('draft:fieldremove:0');
+    noErrors();
+    assert.doesNotMatch(harness.lastText(), /1\. Первый/);
+    await harness.click('draft:fieldremove:0');
+    noErrors();
+    assert.match(harness.lastText(), /Пока вопросов нет/);
+  });
+
+  it('позволяет удалить вопрос и сразу добавить новый', async () => {
+    await gotoFields();
+
+    await harness.click('draft:field:add');
+    await harness.sendText('Черновик вопроса');
+    await harness.click('draft:fieldtype:yesno');
+    await harness.click('draft:fieldreq:yes');
+    noErrors();
+
+    // Возвращаемся к пустому списку и снова жмём «Добавить вопрос»:
+    // экран тот же, нажатие осознанное — оно не должно потеряться.
+    await harness.click('draft:fieldremove:0');
+    noErrors();
+    assert.match(harness.lastText(), /Пока вопросов нет/);
+
+    await harness.click('draft:field:add');
+    noErrors();
+    assert.match(harness.lastText(), /Отправьте текст вопроса/);
+  });
 
   it('не предлагает сохранять набор, если выбранный шаблон не меняли', async () => {
     const template = await harness.templates.createFromFields(500, 'Готовый набор', [templateField]);

@@ -6,7 +6,6 @@ import {
 import { describeField } from '../../domain/presets.js';
 import {
   EFFECTIVE_MODE_LABELS,
-  questionnaireWeight,
   resolveAnswerMode,
 } from '../../domain/questionnaire.js';
 import type {
@@ -99,7 +98,7 @@ const fieldsBlock = (event: DosugEvent): string => {
     const effective = resolveAnswerMode(event.fields, event.answerMode);
     lines.push(
       '',
-      `Вопросы участникам (${event.fields.length}, вес ${questionnaireWeight(event.fields)}):`,
+      `Вопросы участникам (${event.fields.length}):`,
       `Отвечают ${EFFECTIVE_MODE_LABELS[effective]}.`,
     );
     event.fields.forEach((field, index) => lines.push(`${index + 1}. ${describeField(field)}`));
@@ -363,7 +362,7 @@ export const fieldsEditor = (
   const effective = resolveAnswerMode(fields, answerMode);
   const lines = [
     'Вопросы участникам',
-    `Вес: ${questionnaireWeight(fields)} (порог 10). Отвечают ${EFFECTIVE_MODE_LABELS[effective]}.`,
+    `Отвечают ${EFFECTIVE_MODE_LABELS[effective]}.`,
     'Вопросы по умолчанию обязательные; обязательность снимается при создании вопроса.',
     '',
   ];
