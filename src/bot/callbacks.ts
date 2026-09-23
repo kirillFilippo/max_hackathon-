@@ -89,6 +89,8 @@ export const cbRegToggle = (fieldIndex: number, optionIndex: number): string =>
   `reg:toggle:${fieldIndex}:${optionIndex}`;
 
 export const cbRegStart = (code: string): string => `reg:start:${code}`;
+/** Кнопка «Записаться» в приглашении: начинает мастер регистрации. */
+export const cbRegBegin = (code: string): string => `reg:begin:${code}`;
 export const cbRegChange = (code: string): string => `reg:change:${code}`;
 export const cbRegStatus = (code: string, status: string): string => `reg:status:${code}:${status}`;
 export const cbRegAnswer = (index: number, value: string): string => `reg:answer:${index}:${value}`;
@@ -120,7 +122,16 @@ export const buildInviteUrl = (botUsername: string, eventCode: string): string =
 export const buildAnswersUrl = (botUsername: string, eventCode: string): string =>
   `https://max.ru/${botUsername}?startapp=ev_${eventCode}`;
 
+/**
+ * Диплинк мини-приложения с конструктором вопросов. Открываем конструктор тем же
+ * способом, что и анкету участника: MAX сам открывает зарегистрированное
+ * мини-приложение, а подпись мастера едет в `start_param`.
+ */
+export const buildConstructorUrl = (botUsername: string, ticket: string): string =>
+  `https://max.ru/${botUsername}?startapp=${CONSTRUCTOR_START_PREFIX}${ticket}`;
+
 export const EVENT_START_PREFIX = 'ev_';
+export const CONSTRUCTOR_START_PREFIX = 'tpl_';
 
 /** Достаёт код события из payload диплинка `/start`. */
 export const eventCodeFromStartPayload = (payload: string | null | undefined): string | null => {

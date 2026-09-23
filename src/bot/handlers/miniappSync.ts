@@ -106,7 +106,7 @@ export const applyMiniappFields = async (
     // Событие и набор вопросов показывают разные экраны: у набора нет способа ответа,
     // а «Готово» мастера события сохранило бы набор не тем действием.
     const content = draft.kind === 'create-event'
-      ? fieldsEditor(draft.fields, [], answerMode)
+      ? fieldsEditor(draft.fields, answerMode)
       : templateFieldsEditor(draft.name ?? '', draft.fields);
     try {
       await deps.notifier.sendToUser(chatId, content);

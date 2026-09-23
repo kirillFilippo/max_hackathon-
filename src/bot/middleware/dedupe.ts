@@ -42,6 +42,8 @@ export interface DedupeOptions {
   exactTtlMs?: number;
   /** Сколько помнить смысловые нажатия (двойной тап). */
   actionTtlMs?: number;
+  /** Сколько помнить вход в бота: `bot_started` и `/start` — одно действие. */
+  startTtlMs?: number;
   /**
    * Короткое окно «то же действие»: два нажатия одной кнопки подряд быстрее этого
    * времени считаем двойным тапом, даже если экран уже сменился. Живой человек
@@ -55,12 +57,26 @@ export interface DedupeOptions {
 interface SlimUpdate {
   update_type?: string;
   timestamp?: number;
+  payload?: string | null;
   message?: {
     body?: { mid?: string; text?: string | null; attachments?: unknown } | null;
   } | null;
   callback?: { payload?: string | null } | null;
   user?: { user_id?: number } | null;
 }
+
+/**
+ * Вход в бота приходит двумя обновлениями: `bot_started` с payload и сообщение
+ * `/start <payload>`. Смысловой ключ у них один — иначе участник получает
+ * приглашение дважды. Возвращает ключ входа или null, если это не вход.
+ */
+const startActionKey = (type: string, update: SlimUpdate): string | null => {
+  if (type === 'bot_started') return (update.payload ?? '').trim();
+  if (type !== 'message_created') return null;
+  const text = update.message?.body?.text?.trim() ?? '';
+  const match = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(text);
+  return match ? (match[1] ?? '') : null;
+};
 
 /**
  * Отпечаток экрана: текст сообщения и клавиатура. Нужен, потому что после
@@ -94,6 +110,10 @@ export class UpdateDeduplicator {
     return this.options.sameActionCooldownMs ?? 250;
   }
 
+  private get startTtl(): number {
+    return this.options.startTtlMs ?? 20 * 1000;
+  }
+
   private get maxEntries(): number {
     return this.options.maxEntries ?? 5000;
   }
@@ -111,6 +131,13 @@ export class UpdateDeduplicator {
 
     const exactKey = `e:${type}:${update.timestamp ?? 0}:${mid}:${payload}`;
     const exactDuplicate = this.touch(exactKey, now, this.exactTtl);
+
+    // Вход в бота: `bot_started` и `/start <payload>` — одно действие, не два.
+    const startKey = startActionKey(type, update);
+    if (startKey !== null && this.touch(`s:${userId}:${startKey}`, now, this.startTtl)) {
+      this.logger.debug(`Пропускаю повторный вход в бота (${startKey || 'без payload'})`);
+      return true;
+    }
 
     // Смысловой ключ только для кнопок: у текстовых сообщений mid уникален.
     // В ключ входит отпечаток экрана, иначе одинаковые кнопки на соседних шагах
@@ -152,7 +179,11 @@ export class UpdateDeduplicator {
 
   private evict(now: number): void {
     for (const [key, seenAt] of this.seen) {
-      const ttl = key.startsWith('a:') ? this.actionTtl : this.exactTtl;
+      const ttl = key.startsWith('a:')
+        ? this.actionTtl
+        : key.startsWith('s:')
+          ? this.startTtl
+          : this.exactTtl;
       if (now - seenAt >= ttl) this.seen.delete(key);
     }
   }

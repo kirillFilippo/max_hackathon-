@@ -16,11 +16,26 @@ import { userIdOf } from '../helpers.js';
 
 /** Вход в бота: по ссылке-приглашению (payload) или обычный. */
 export const handleBotStarted = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
-  const code = eventCodeFromStartPayload(ctx.startPayload);
+  await handleStart(ctx, deps, ctx.startPayload ?? null);
+};
+
+/**
+ * Единая обработка входа: и для `bot_started`, и для команды `/start`.
+ * Повторную доставку того же входа отсекает дедупликатор (см. `bot/middleware/dedupe`),
+ * поэтому здесь нет своей отметки «уже отвечали».
+ */
+export const handleStart = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  payload: string | null,
+): Promise<void> => {
+  const code = eventCodeFromStartPayload(payload);
   if (code) {
     await startRegistration(ctx, deps, code);
     return;
   }
+
+  if (ctx.session) ctx.session.draft = null;
   await showMainMenu(ctx, deps);
 };
 
@@ -33,6 +48,14 @@ export const handleMessage = async (ctx: BotContext, deps: AppDeps): Promise<voi
       ctx,
       withKeyboard('Пришлите текст или воспользуйтесь кнопками ниже.', [[cb('В меню', CB.menuMain)]]),
     );
+    return;
+  }
+
+  // `/start` и `/start@Бот`: команда уже обработана выше, но у разных клиентов
+  // MAX текст может прийти и сюда — тогда отвечаем тем же путём, без дублей.
+  const startCommand = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(input);
+  if (startCommand) {
+    await handleStart(ctx, deps, startCommand[1] ?? null);
     return;
   }
 
@@ -71,13 +94,7 @@ const wrap = (
 
 export const registerCommands = (bot: import('@maxhub/max-bot-api').Bot<BotContext>, deps: AppDeps): void => {
   bot.command('start', wrap(deps, 'start', async (ctx) => {
-    const code = eventCodeFromStartPayload(ctx.startPayload);
-    if (code) {
-      await startRegistration(ctx, deps, code);
-      return;
-    }
-    if (ctx.session) ctx.session.draft = null;
-    await showMainMenu(ctx, deps);
+    await handleStart(ctx, deps, ctx.startPayload ?? null);
   }));
 
   bot.command('help', wrap(deps, 'help', async (ctx) => {

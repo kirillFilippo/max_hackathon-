@@ -192,16 +192,11 @@ export const startRegistration = async (
     return;
   }
 
+  // Нового участника не тащим сразу в мастер: на одну ссылку уходило два
+  // сообщения (карточка и первый шаг). Сначала приглашение с кнопкой «Записаться».
   const participants = await deps.participants.listByEvent(event.id);
-  if (ctx.session) {
-    ctx.session.draft = {
-      kind: 'register',
-      step: 'name',
-      data: { eventCode: event.code, answers: {}, fieldIndex: 0 },
-    };
-    ctx.session.lastEventCode = event.code;
-  }
-  await replyTo(
+  if (ctx.session) ctx.session.lastEventCode = event.code;
+  await show(
     ctx,
     invitationCard(event, deps.events.stats(event, participants), {
       ...eventViewOptions(ctx, deps),
@@ -210,6 +205,51 @@ export const startRegistration = async (
         : undefined,
     }),
   );
+};
+
+/**
+ * Начало мастера регистрации: приглашение уже показано, спрашиваем имя.
+ * Отдельная функция, потому что приглашение и мастер — два разных сообщения.
+ */
+export const beginRegistration = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  code: string,
+): Promise<void> => {
+  const event = await deps.events.findByCode(code);
+  if (!event) {
+    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
+    return;
+  }
+  if (event.status === 'closed') {
+    await show(
+      ctx,
+      withKeyboard(
+        `Событие «${event.title}» (${formatDateTime(event.startsAt, deps.config.appTz)}) уже завершено.`,
+        menuRow,
+      ),
+    );
+    return;
+  }
+
+  const user = requireUser(ctx);
+  await deps.profiles.touchFromMax(user);
+
+  // Заявка уже есть — открываем её на изменение, а не заводим вторую.
+  const existing = await deps.participants.find(event.id, user.user_id);
+  if (existing) {
+    await startEditRegistration(ctx, deps, code);
+    return;
+  }
+
+  if (ctx.session) {
+    ctx.session.draft = {
+      kind: 'register',
+      step: 'name',
+      data: { eventCode: event.code, answers: {}, fieldIndex: 0 },
+    };
+    ctx.session.lastEventCode = event.code;
+  }
   const profile = await deps.profiles.get(user.user_id);
   await show(ctx, namePrompt(event, profile?.name || user.name));
 };

@@ -21,6 +21,8 @@ export interface EventDraftData {
   description?: string;
   limit?: number | null;
   templateId?: string | null;
+  /** Отпечаток вопросов выбранного набора: если не изменился — не предлагаем сохранять. */
+  templateSnapshot?: string | null;
   saveTemplateName?: string | null;
   /** Как участники отвечают на анкету: авто по весу, чат или мини-приложение. */
   answerMode?: AnswerMode;

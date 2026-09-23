@@ -106,6 +106,13 @@ describe('Мини-приложение конструктора вопросо�
     assert.match(html, /Автоматически по весу вопросов/);
     assert.match(html, new RegExp(String(MINIAPP_CHAT_WEIGHT_LIMIT)));
     assert.match(html, /https:\/\/st\.max\.ru\/js\/max-web-app\.js|WebApp/);
+    // Подпись мастера приходит и ссылкой мини-приложения (start_param), и через ?t=.
+    assert.match(html, /start_param/);
+    assert.match(html, /tpl_/);
+    // Без WebApp.ready() вебвью MAX может остаться на экране загрузки.
+    assert.match(html, /WebApp\.ready\(\)/);
+    // Анкета участника живёт на той же странице — уводим её по start_param.
+    assert.match(html, /\/app\/answer/);
   });
 
   it('сохраняет ограничения и способ ответа, приводя данные к безопасному виду', async () => {
@@ -245,6 +252,10 @@ describe('Анкета участника в мини-приложении', () 
     assert.match(html, /https:\/\/st\.max\.ru\/js\/max-web-app\.js/);
     assert.match(html, /start_param/);
     assert.match(html, /app\/answers/);
+    // Конструктор вопросов открывается тем же мини-приложением — уводим по start_param.
+    assert.match(html, /tpl_/);
+    assert.match(html, /\/app\/questions\?t=/);
+    assert.match(html, /WebApp\.ready\(\)/);
   });
 
   it('отдаёт анкету по коду события', async () => {

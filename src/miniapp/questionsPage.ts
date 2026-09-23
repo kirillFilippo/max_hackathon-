@@ -102,7 +102,39 @@ const MAX_OPTIONS = ${MINIAPP_MAX_OPTIONS};
 const CHAT_LIMIT = ${MINIAPP_CHAT_WEIGHT_LIMIT};
 const TYPES = [['text','Текст'],['number','Число'],['choice','Выбор из вариантов'],['yesno','Да / Нет'],['date','Дата']];
 
-const ticket = new URLSearchParams(location.search).get('t') || '';
+/** Стартовый параметр мини-приложения: мост MAX или фрагмент ссылки. */
+const readStartParam = () => {
+  try {
+    const fromBridge = window.WebApp && window.WebApp.initDataUnsafe && window.WebApp.initDataUnsafe.start_param;
+    if (fromBridge) return String(fromBridge);
+  } catch (error) { /* мост мог не подняться */ }
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  return fragment.get('WebAppStartParam') || '';
+};
+
+const startParam = readStartParam();
+
+// Мини-приложение открыто — сообщаем об этом MAX, иначе вебвью может остаться
+// на экране загрузки. Вне MAX моста нет: страница работает как обычный сайт.
+try {
+  if (window.WebApp) {
+    window.WebApp.ready();
+    if (window.WebApp.expand) window.WebApp.expand();
+  }
+} catch (error) { /* не критично */ }
+
+// Анкету участника и конструктор обслуживает одно мини-приложение: если открыли
+// анкету (start_param вида ev_...), уходим на её страницу.
+if (startParam.startsWith('ev_')) {
+  location.replace('/app/answer' + location.hash);
+}
+
+// Подпись мастера приходит либо прямой ссылкой (?t=), либо через start_param.
+const ticket = (() => {
+  const fromQuery = new URLSearchParams(location.search).get('t') || '';
+  if (fromQuery) return fromQuery;
+  return startParam.startsWith('tpl_') ? startParam.slice(4) : '';
+})();
 const noticeEl = document.getElementById('notice');
 const listEl = document.getElementById('list');
 const nameEl = document.getElementById('name');

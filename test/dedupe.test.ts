@@ -10,7 +10,8 @@ const silent = createLogger('error');
 interface FakeUpdate {
   update_type: string;
   timestamp: number;
-  message?: { body?: { mid?: string } };
+  payload?: string;
+  message?: { body?: { mid?: string; text?: string } };
   callback?: { payload?: string };
   user?: { user_id: number };
 }
@@ -98,5 +99,46 @@ describe('Защита от повторной обработки действи
       dedupe.isDuplicate(ctxOf(callback(`draft:skip`, `mid-${index}`, 1000 + index)));
     }
     assert.ok(dedupe.size <= 10, `карта выросла до ${dedupe.size}`);
+  });
+
+  it('считает bot_started и /start одним входом', async () => {
+    const dedupe = new UpdateDeduplicator(silent, { startTtlMs: 30 });
+
+    const botStarted: FakeUpdate = {
+      update_type: 'bot_started',
+      timestamp: 1000,
+      payload: 'ev_A7K2Q',
+      user: { user_id: 7 },
+    };
+    const startMessage: FakeUpdate = {
+      update_type: 'message_created',
+      timestamp: 1010,
+      message: { body: { mid: 'msg-start', text: '/start ev_A7K2Q' } },
+      user: { user_id: 7 },
+    };
+
+    // MAX присылает оба обновления на одну ссылку — обрабатываем только первое.
+    assert.equal(dedupe.isDuplicate(ctxOf(botStarted)), false);
+    assert.equal(dedupe.isDuplicate(ctxOf(startMessage)), true);
+
+    // Другой участник и другой код события — это не дубль (у обновлений свои timestamp).
+    assert.equal(dedupe.isDuplicate(ctxOf({ ...botStarted, timestamp: 1011, user: { user_id: 8 } })), false);
+    assert.equal(dedupe.isDuplicate(ctxOf({ ...botStarted, timestamp: 1012, payload: 'ev_ZZZZZ' })), false);
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    // Окно входа истекло: по той же ссылке можно зайти снова.
+    assert.equal(dedupe.isDuplicate(ctxOf({ ...botStarted, timestamp: 1030 })), false);
+  });
+
+  it('не считает входом обычный текст со словом start', () => {
+    const dedupe = new UpdateDeduplicator(silent);
+    const text: FakeUpdate = {
+      update_type: 'message_created',
+      timestamp: 1000,
+      message: { body: { mid: 'msg-1', text: 'start' } },
+      user: { user_id: 7 },
+    };
+    assert.equal(dedupe.isDuplicate(ctxOf(text)), false);
+    assert.equal(dedupe.isDuplicate(ctxOf({ ...text, message: { body: { mid: 'msg-2', text: 'старт' } } })), false);
   });
 });

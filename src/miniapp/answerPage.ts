@@ -87,18 +87,6 @@ const notify = (text) => {
   setTimeout(() => statusEl.classList.remove('show'), 2600);
 };
 
-/** Стартовые параметры: payload диплинка (start_param) или ?code= для отладки. */
-const readStartParam = () => {
-  try {
-    const fromBridge = window.WebApp && window.WebApp.initDataUnsafe && window.WebApp.initDataUnsafe.start_param;
-    if (fromBridge) return String(fromBridge);
-  } catch (error) { /* мост мог не подняться — не критично */ }
-  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-  const fromFragment = fragment.get('WebAppStartParam');
-  if (fromFragment) return fromFragment;
-  return codeFromUrl;
-};
-
 const initData = () => {
   try {
     return (window.WebApp && window.WebApp.initData) || '';
@@ -107,8 +95,32 @@ const initData = () => {
   }
 };
 
+// Мини-приложение открыто — говорим об этом MAX, иначе вебвью может так и
+// остаться на экране загрузки.
+try {
+  if (window.WebApp) {
+    window.WebApp.ready();
+    if (window.WebApp.expand) window.WebApp.expand();
+  }
+} catch (error) { /* открыто вне MAX — работаем как обычная страница */ }
+
+const startParam = (() => {
+  try {
+    const fromBridge = window.WebApp && window.WebApp.initDataUnsafe && window.WebApp.initDataUnsafe.start_param;
+    if (fromBridge) return String(fromBridge);
+  } catch (error) { /* мост мог не подняться */ }
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  return fragment.get('WebAppStartParam') || codeFromUrl || '';
+})();
+
+// Конструктор вопросов живёт на этой же странице мини-приложения: разводим их
+// по стартовому параметру, чтобы организатор попадал в конструктор, а не в анкету.
+if (startParam.startsWith('tpl_')) {
+  location.replace('/app/questions?t=' + encodeURIComponent(startParam.slice(4)) + location.hash);
+}
+
 const code = (() => {
-  const value = readStartParam() || '';
+  const value = startParam || '';
   return value.startsWith('ev_') ? value.slice(3).toUpperCase() : value.toUpperCase();
 })();
 

@@ -1,5 +1,6 @@
 import { DEFAULT_TIME, formatDateTime, parseLimit, parseUserDateTime } from '../../../domain/datetime.js';
 import { addressWarning, normalizePlace } from '../../../domain/maps.js';
+import { questionnaireFingerprint } from '../../../domain/questionnaire.js';
 import type { DraftState } from '../../session.js';
 import { CB, cbDraftTemplate, cbEventLink, parseCallback } from '../../callbacks.js';
 import { replyTo, show, userText, type BotContext } from '../../context.js';
@@ -287,6 +288,7 @@ export const handleCreateEventDraft = async (
       if (templateId === 'none') {
         draft.fields = [];
         draft.data.templateId = null;
+        draft.data.templateSnapshot = null;
         draft.step = 'confirm';
         await show(ctx, createSummary(draft.data, draft.fields, eventViewOptions(ctx, deps)));
         return true;
@@ -294,13 +296,16 @@ export const handleCreateEventDraft = async (
       if (templateId === 'own') {
         draft.fields = [];
         draft.data.templateId = null;
+        draft.data.templateSnapshot = null;
         draft.step = 'fields';
-        // Экран вопросов: добавить свой, взять подсказку или собрать в приложении.
+        // Экран вопросов: добавляем свои вопросы или собираем их в приложении.
         await renderFieldsScreen(ctx, deps, draft);
         return true;
       }
       draft.fields = await deps.templates.fieldsFor(templateId, userIdOf(ctx));
       draft.data.templateId = templateId;
+      // Запоминаем исходный набор: если вопросы не меняли, сохранять шаблон не предлагаем.
+      draft.data.templateSnapshot = questionnaireFingerprint(draft.fields);
       draft.step = 'fields';
       await renderFieldsScreen(ctx, deps, draft);
       return true;
@@ -309,6 +314,18 @@ export const handleCreateEventDraft = async (
     case 'fields': {
       // Пока открыт редактор вопроса, «Дальше» не должно срабатывать.
       if (!draft.editor && isCallback && action === 'draft' && args[0] === 'skip') {
+        const fromTemplate = draft.data.templateId;
+        const unchanged = Boolean(fromTemplate)
+          && draft.data.templateSnapshot === questionnaireFingerprint(draft.fields);
+        if (unchanged) {
+          // Взяли готовый набор и ничего в нём не поменяли — сохранять нечего.
+          draft.step = 'confirm';
+          await show(ctx, createSummary(draft.data, draft.fields, {
+            ...eventViewOptions(ctx, deps),
+            answerMode: draft.data.answerMode ?? 'auto',
+          }));
+          return true;
+        }
         draft.step = 'save-template';
         // Название могло прийти из конструктора вопросов — тогда не спрашиваем его заново.
         await show(ctx, promptSaveTemplate(draft.data.saveTemplateName));

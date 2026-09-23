@@ -6,13 +6,19 @@ import {
 } from '../../domain/questionnaire.js';
 import type { AnswerMode } from '../../domain/types.js';
 import { newTicket } from '../../miniapp/server.js';
-import { CB, cbEventCard, cbQuestionsModeBack, cbQuestionsModeSet } from '../callbacks.js';
+import {
+  buildConstructorUrl,
+  CB,
+  cbEventCard,
+  cbQuestionsModeBack,
+  cbQuestionsModeSet,
+} from '../callbacks.js';
 import { show, type BotContext } from '../context.js';
 import type { AppDeps } from '../deps.js';
-import { button, cb, withKeyboard, type MessageContent } from '../message.js';
+import { button, cb, link, withKeyboard, type KeyboardRows, type MessageContent } from '../message.js';
 import type { EventDraftData, FieldEditorHost } from '../session.js';
 import { fieldsEditor } from '../texts/event.js';
-import { userIdOf } from './helpers.js';
+import { botUsernameOf, userIdOf } from './helpers.js';
 
 /**
  * Черновик с вопросами. Способ ответа и выбранный шаблон есть только у события,
@@ -22,38 +28,19 @@ export interface QuestionsHost extends FieldEditorHost {
   data?: Pick<EventDraftData, 'templateId' | 'answerMode'>;
 }
 
-/** Подсказки для экрана вопросов: поля выбранного шаблона и частые вопросы. */
-export const fieldSuggestions = async (deps: AppDeps, host: QuestionsHost): Promise<string[]> => {
-  const used = new Set(host.fields.map((field) => field.label.toLowerCase()));
-  const templateId = host.data?.templateId ?? null;
-  const fromTemplate = templateId
-    ? (await deps.templates.find(templateId, 0))?.fields.map((field) => field.label) ?? []
-    : [];
-  const common = [
-    'Что принесёте с собой?',
-    'Нужна помощь, как добраться?',
-    'Во сколько удобно прийти?',
-    'Есть ограничения по еде?',
-    'Контакт для срочной связи',
-  ];
-  return [...new Set([...fromTemplate, ...common])]
-    .filter((label) => !used.has(label.toLowerCase()))
-    .slice(0, 4);
-};
-
-/** Экран вопросов: список, подсказки, способ ответа, вход в мини-приложение. */
+/** Экран вопросов: список, способ ответа, вход в мини-приложение. */
 export const renderFieldsScreen = async (
   ctx: BotContext,
-  deps: AppDeps,
+  _deps: AppDeps,
   host: QuestionsHost,
 ): Promise<void> => {
-  const mode = host.data?.answerMode ?? 'auto';
-  await show(ctx, fieldsEditor(host.fields, await fieldSuggestions(deps, host), mode));
+  await show(ctx, fieldsEditor(host.fields, host.data?.answerMode ?? 'auto'));
 };
 
 /**
- * Конструктор вопросов в мини-приложении. Бот выдаёт одноразовый тикет и
- * присылает кнопку: удобнее собирать тяжёлую анкету списком, чем по шагам в чате.
+ * Конструктор вопросов в мини-приложении. Бот выдаёт подпись мастера и присылает
+ * ссылку на то же мини-приложение, что открывает анкету участника (MAX сам
+ * подставляет зарегистрированный адрес), а подпись едет в `start_param`.
  */
 export const openQuestionsApp = async (
   ctx: BotContext,
@@ -61,7 +48,7 @@ export const openQuestionsApp = async (
   host: QuestionsHost,
 ): Promise<void> => {
   if (!deps.miniapp) {
-    const fallback = fieldsEditor(host.fields, await fieldSuggestions(deps, host), host.data?.answerMode ?? 'auto');
+    const fallback = fieldsEditor(host.fields, host.data?.answerMode ?? 'auto');
     await show(ctx, {
       text: [
         'Конструктор вопросов недоступен: мини-приложение не настроено (нет MINIAPP_URL).',
@@ -75,8 +62,16 @@ export const openQuestionsApp = async (
 
   const ticket = newTicket();
   deps.miniapp.registerTicket(ticket, { userId: userIdOf(ctx), at: Date.now() });
-  // В ссылке только подпись: черновик вопросов страница забирает сама.
-  const url = deps.miniapp.buildUrl(ticket);
+  const username = botUsernameOf(ctx, deps);
+  const rows: KeyboardRows = [];
+
+  if (username) {
+    rows.push([link('Открыть конструктор', buildConstructorUrl(username, ticket))]);
+  } else {
+    // Ник бота неизвестен — остаётся прямая ссылка на мини-приложение.
+    rows.push([button.openApp('Открыть конструктор', deps.miniapp.buildUrl(ticket))]);
+  }
+  rows.push([cb('Вернуться к вопросам', CB.draftSkip)]);
 
   await show(
     ctx,
@@ -84,11 +79,11 @@ export const openQuestionsApp = async (
       [
         'Конструктор вопросов',
         '',
-        'Откройте мини-приложение, соберите вопросы списком и нажмите «Сохранить в бота».',
+        'Соберите вопросы списком и нажмите «Сохранить в бота».',
         'Там же задаются ограничения ответов и название набора для шаблона.',
         'После сохранения вернитесь в чат — вопросы появятся на этом экране.',
       ].join('\n'),
-      [[button.openApp('Открыть конструктор', url)], [cb('Вернуться к вопросам', CB.draftSkip)]],
+      rows,
     ),
   );
 };

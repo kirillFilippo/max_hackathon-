@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
+import type { EventField } from '../src/domain/types.js';
 import { createBotHarness, type BotHarness } from './botHarness.js';
 
 let harness: BotHarness;
@@ -250,5 +251,132 @@ describe('Защита от двойных нажатий', () => {
     const texts = harness.texts();
     assert.equal(texts.length, 1, `на один шаг пришло ${texts.length} сообщения: ${texts.join(' | ')}`);
     assert.match(texts[0] ?? '', /Шаг 6 из 6|Вопросы участникам/);
+  });
+});
+
+describe('Ссылка-приглашение не дублирует карточку', () => {
+  it('отвечает одним сообщением, когда MAX присылает и bot_started, и /start', async () => {
+    const event = await harness.events.create({
+      title: 'Встреча',
+      description: '',
+      startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+      place: 'кафе на Ленина',
+      placeCoords: null,
+      limit: null,
+      fields: [],
+      answerMode: 'auto',
+      organizerId: 500,
+      organizerName: 'Тестовый организатор',
+    });
+
+    // MAX на переход по ссылке присылает оба обновления — приглашение одно.
+    await harness.start(`ev_${event.code}`, { chatId: 700, userId: 700 });
+    assert.equal(harness.texts(700).length, 1, `пришло ${harness.texts(700).length} сообщения`);
+    assert.match(harness.lastText(700), /Приглашение на событие/);
+    await harness.sendText(`/start ev_${event.code}`, { chatId: 700, userId: 700 });
+    assert.equal(
+      harness.texts(700).length,
+      1,
+      `повторный вход продублировал приглашение: ${harness.texts(700).length} сообщения`,
+    );
+
+    // Обратный порядок тоже не должен дублировать ответ.
+    await harness.sendText(`/start ev_${event.code}`, { chatId: 701, userId: 701 });
+    await harness.start(`ev_${event.code}`, { chatId: 701, userId: 701 });
+    assert.equal(harness.texts(701).length, 1, `пришло ${harness.texts(701).length} сообщения`);
+
+    // Мастер регистрации начинается по кнопке «Записаться», а не сам по себе.
+    await harness.click(`reg:begin:${event.code}`, { chatId: 700, userId: 700 });
+    noErrors(700);
+    assert.equal(harness.texts(700).length, 2, 'мастер не начался по кнопке');
+    assert.match(harness.lastText(700), /Как вас записать/);
+
+    noErrors(701);
+  });
+});
+
+describe('Вопросы: выбор готового набора и кнопки экрана', () => {
+  const templateField: EventField = {
+    id: 'f1',
+    label: 'Что взять с собой?',
+    type: 'text',
+    options: [],
+    multiple: false,
+    minSelected: null,
+    maxSelected: null,
+    min: null,
+    max: null,
+    maxLength: null,
+    required: true,
+  };
+
+  /** Доводит мастер до экрана вопросов: свой набор или выбранный шаблон. */
+  const gotoFields = async (templateId?: string): Promise<void> => {
+    await harness.click('ev:new');
+    await harness.sendText('Поход');
+    await harness.sendText('завтра 19:00');
+    await harness.sendText('лес');
+    await harness.click('draft:place:ok');
+    await harness.click('draft:skip');
+    await harness.click('draft:skip');
+    await harness.click(templateId ? `draft:template:${templateId}` : 'draft:template:own');
+    noErrors();
+  };
+
+  it('не предлагает сохранять набор, если выбранный шаблон не меняли', async () => {
+    const template = await harness.templates.createFromFields(500, 'Готовый набор', [templateField]);
+    await gotoFields(template.id);
+    assert.match(harness.lastText(), /Что взять с собой\?/);
+
+    const buttons = harness.lastButtons().map((button) => button.text);
+    assert.ok(buttons.includes('Добавить вопрос'), `нет кнопки добавления: ${buttons.join(', ')}`);
+    assert.ok(buttons.some((text) => text.startsWith('Удалить:')), 'нет кнопки удаления вопроса');
+    assert.ok(!buttons.some((text) => text.startsWith('Взять:')), 'подсказки-заготовки больше не нужны');
+
+    await harness.click('draft:skip');
+    noErrors();
+    assert.match(harness.lastText(), /Проверьте событие/);
+    assert.doesNotMatch(harness.lastText(), /шаблон/i);
+  });
+
+  it('предлагает сохранить набор, если вопросы изменили', async () => {
+    const template = await harness.templates.createFromFields(500, 'Готовый набор', [templateField]);
+    await gotoFields(template.id);
+
+    await harness.click('draft:field:add');
+    await harness.sendText('Во сколько придёте?');
+    await harness.click('draft:fieldtype:text');
+    await harness.click('draft:editorskip');
+    await harness.click('draft:fieldreq:yes');
+    noErrors();
+
+    await harness.click('draft:skip');
+    noErrors();
+    assert.match(harness.lastText(), /Сохранить/);
+  });
+
+  it('открывает конструктор ссылкой мини-приложения и выдаёт подпись', async () => {
+    const tickets: string[] = [];
+    harness.deps.miniapp = {
+      buildUrl: (ticket: string) => `https://example.test/app/questions?t=${ticket}`,
+      registerTicket: (ticket: string) => { tickets.push(ticket); },
+      takeTicket: () => null,
+    };
+    try {
+      await gotoFields();
+      await harness.click('app:questions:draft');
+      noErrors();
+
+      const open = harness.lastButtons().find((button) => button.text === 'Открыть конструктор');
+      assert.ok(open, 'нет кнопки открытия конструктора');
+      assert.match(
+        open.url,
+        /^https:\/\/max\.ru\/DosugTestBot\?startapp=tpl_[0-9a-f]{24}$/,
+        `конструктор открывается не ссылкой мини-приложения: ${open.url}`,
+      );
+      assert.equal(tickets.length, 1, 'подпись мастера не выдана');
+    } finally {
+      harness.deps.miniapp = null;
+    }
   });
 });

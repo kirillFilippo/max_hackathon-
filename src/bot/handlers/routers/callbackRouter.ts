@@ -44,7 +44,7 @@ import { startCreateEvent } from '../drafts/createEvent.js';
 import { startAddItems, startItemPrice, startReserveNumbers } from '../drafts/items.js';
 import { startEditField } from '../drafts/editEvent.js';
 import { startTemplateCreate, startTemplateEdit, startTemplateRename } from '../drafts/templates.js';
-import { quickStatusChange, startEditRegistration, startRegistration } from '../drafts/register.js';
+import { beginRegistration, quickStatusChange, startEditRegistration } from '../drafts/register.js';
 import { editMenu } from '../../texts/event.js';
 import { menuRow } from '../helpers.js';
 
@@ -248,8 +248,9 @@ export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<vo
 
     case 'reg': {
       const [sub, code = '', status = ''] = args;
-      if (sub === 'start') {
-        await startRegistration(ctx, deps, code);
+      // «Записаться» из приглашения (begin) и старая кнопка start ведут в мастер.
+      if (sub === 'begin' || sub === 'start') {
+        await beginRegistration(ctx, deps, code);
         return;
       }
       if (sub === 'change') {

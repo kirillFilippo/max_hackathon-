@@ -58,8 +58,8 @@ export interface BotHarness extends Harness {
   texts(chatId?: number): string[];
   /** Последний ответ бота. */
   lastText(chatId?: number): string;
-  /** Все кнопки из последнего ответа бота: текст и payload. */
-  lastButtons(chatId?: number): Array<{ text: string; payload: string }>;
+  /** Все кнопки из последнего ответа бота: текст, payload и ссылка. */
+  lastButtons(chatId?: number): Array<{ text: string; payload: string; url: string }>;
   /** Все показанные экраны: новые сообщения и правки. */
   screens(chatId?: number): SentMessage[];
   clearSent(): void;
@@ -320,12 +320,14 @@ export const createBotHarness = async (): Promise<BotHarness> => {
       const target = [...screensOf(chatId)].reverse()[0];
       const attachments = (target?.attachments ?? []) as Array<{
         type?: string;
-        payload?: { buttons?: Array<Array<{ text: string; payload?: string }>> };
+        payload?: { buttons?: Array<Array<{ text: string; payload?: string; url?: string }>> };
       }>;
       const keyboard = attachments.find((item) => item.type === 'inline_keyboard');
       return (keyboard?.payload?.buttons ?? []).flat().map((button) => ({
         text: button.text,
         payload: button.payload ?? '',
+        // Кнопка-ссылка несёт url, а не payload: тесты проверяют ссылки на мини-приложение.
+        url: button.url ?? '',
       }));
     },
     clearSent() {

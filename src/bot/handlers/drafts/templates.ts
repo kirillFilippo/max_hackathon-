@@ -60,7 +60,7 @@ export const handleNewTemplateDraft = async (
       await show(
         ctx,
         withKeyboard('В наборе нет ни одного вопроса — добавьте хотя бы один.', [
-          [cb('Свой вопрос', CB.draftFieldAdd)],
+          [cb('Добавить вопрос', CB.draftFieldAdd)],
           [cb('Конструктор в приложении', cbQuestionsApp('draft'))],
           ...cancelRow,
         ]),

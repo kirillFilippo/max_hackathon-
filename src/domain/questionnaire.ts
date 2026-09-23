@@ -89,3 +89,24 @@ export const normalizeFields = (raw: unknown): EventField[] => {
 /** Новое поле: обязательное по умолчанию, без ограничений. */
 export const createEmptyField = (label: string, type: FieldType): EventField =>
   normalizeField({ id: '', label, type });
+
+/**
+ * Отпечаток анкеты: нужен, чтобы понять, менял ли организатор вопросы после
+ * выбора готового набора. Служебные `id` в отпечаток не входят — они новые
+ * у каждого поля, и из-за них «ничего не менял» выглядело бы как изменение.
+ */
+export const questionnaireFingerprint = (fields: EventField[]): string =>
+  JSON.stringify(
+    fields.map((field) => [
+      field.label.trim(),
+      field.type,
+      [...field.options],
+      field.multiple,
+      field.minSelected,
+      field.maxSelected,
+      field.min,
+      field.max,
+      field.maxLength,
+      field.required,
+    ]),
+  );

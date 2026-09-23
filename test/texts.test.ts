@@ -139,7 +139,10 @@ describe('Тексты бота', () => {
       assertNoEmoji(card.text, 'приглашение');
       // Прямой ссылки на карту в приглашении нет — только через «Доп. информацию».
       assert.ok(!buttons.some((item) => item.type === 'link' && item.url.includes('yandex.ru/maps')));
-      assert.ok(buttons.some((item) => item.type === 'callback' && item.payload.startsWith('reg:start:')));
+      assert.ok(
+        buttons.some((item) => item.type === 'callback' && item.payload.startsWith('reg:begin:')),
+        'в приглашении нет кнопки «Записаться»',
+      );
       assert.ok(buttons.some((item) => item.type === 'callback' && item.payload.startsWith('ev:info:')));
     }
   });
