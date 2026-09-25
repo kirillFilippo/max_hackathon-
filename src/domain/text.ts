@@ -15,3 +15,21 @@ export const normalizeUserTextSpaces = (value: string): string =>
 /** Вариант без пробелов вообще: «1 200,50 ₽» → «1200,50₽». */
 export const normalizeUserTextTight = (value: string): string =>
   normalizeUserText(value).replace(/\s|\u00a0/g, '');
+
+/**
+ * Разбирает число из пользовательского ввода: «2,5», «1 200», «-3».
+ * Возвращает null, если это не число. Одна реализация на ответы участника,
+ * ограничения вопросов из мини-приложения и разбор сумм.
+ */
+export const parseDecimal = (value: unknown): number | null => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const normalized = normalizeUserTextTight(value).replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/** Ограничивает число диапазоном: используется для проверки присланных лимитов. */
+export const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max);

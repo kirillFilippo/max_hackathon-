@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { clampNumber, parseDecimal } from '../src/domain/text.js';
 import { describe, it } from 'node:test';
 
 import { computeSettlement, formatRub, parsePriceKopecks, toKopecks } from '../src/domain/money.js';
@@ -177,5 +178,29 @@ describe('FAQ', () => {
     } finally {
       await harness.stop();
     }
+  });
+});
+
+describe('Разбор чисел и нормализация текста', () => {
+  it('принимает запятую, пробелы и минус', () => {
+    assert.equal(parseDecimal('2,5'), 2.5);
+    assert.equal(parseDecimal('1 200'), 1200);
+    assert.equal(parseDecimal(' -3 '), -3);
+    assert.equal(parseDecimal(7), 7);
+    assert.equal(parseDecimal('1200,50'), 1200.5);
+  });
+
+  it('возвращает null вместо мусора', () => {
+    assert.equal(parseDecimal(''), null);
+    assert.equal(parseDecimal('два'), null);
+    assert.equal(parseDecimal('12,3,4'), null);
+    assert.equal(parseDecimal(Number.NaN), null);
+    assert.equal(parseDecimal(undefined), null);
+  });
+
+  it('ограничивает значение диапазоном', () => {
+    assert.equal(clampNumber(5, 1, 3), 3);
+    assert.equal(clampNumber(0, 1, 3), 1);
+    assert.equal(clampNumber(2, 1, 3), 2);
   });
 });

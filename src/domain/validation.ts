@@ -1,4 +1,4 @@
-import { normalizeUserText, normalizeUserTextSpaces, normalizeUserTextTight } from './text.js';
+import { normalizeUserText, normalizeUserTextSpaces, parseDecimal } from './text.js';
 import { FIELD_TYPE_LABELS, type EventField } from './types.js';
 
 /**
@@ -15,13 +15,6 @@ const MAX_TEXT_LENGTH = 500;
 
 const isBlank = (value: string | null | undefined): boolean =>
   value === null || value === undefined || value.trim() === '';
-
-const parseNumber = (input: string): number | null => {
-  const normalized = normalizeUserTextTight(input).replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
-  const value = Number(normalized);
-  return Number.isFinite(value) ? value : null;
-};
 
 const parseDate = (input: string): string | null => {
   const raw = normalizeUserTextSpaces(input);
@@ -139,7 +132,7 @@ export const validateAnswer = (field: EventField, input: string | null | undefin
 
   switch (field.type) {
     case 'number': {
-      const value = parseNumber(raw);
+      const value = parseDecimal(raw);
       if (value === null) return { ok: false, error: 'Нужно число, например 3 или 2,5.' };
       if (field.min !== null && value < field.min) return { ok: false, error: `Слишком мало: минимум ${field.min}.` };
       if (field.max !== null && value > field.max) return { ok: false, error: `Слишком много: максимум ${field.max}.` };

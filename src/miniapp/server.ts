@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import type { AnswerMode, EventField, FieldType, ParticipantStatus } from '../domain/types.js';
 import { validateInitData } from './auth.js';
 import { renderAnswerPageHtml } from './answerPage.js';
+import { clampNumber, parseDecimal } from '../domain/text.js';
 import { FIELD_TYPES } from '../domain/types.js';
 import type { Logger } from '../logger.js';
 import {
@@ -124,9 +125,8 @@ const readBody = async (req: IncomingMessage, limit = 64 * 1024): Promise<string
 
 const toBoundedNumber = (value: unknown, min: number, max: number): number | null => {
   if (value === null || value === undefined || value === '') return null;
-  const parsed = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  if (!Number.isFinite(parsed)) return null;
-  return Math.min(Math.max(parsed, min), max);
+  const parsed = parseDecimal(value);
+  return parsed === null ? null : clampNumber(parsed, min, max);
 };
 
 /** Приводит присланные из мини-приложения вопросы к безопасному виду. */
