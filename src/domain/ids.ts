@@ -31,3 +31,13 @@ export const normalizeCode = (raw: string): string =>
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
+
+/**
+ * Синтетический пользователь отладочного события: нужен, чтобы посмотреть
+ * карточки, состав и расчёты, но в MAX такого человека нет. Отрицательный id —
+ * признак «сообщения этому пользователю не доставляем»: настоящие id в MAX
+ * всегда положительные.
+ */
+export const syntheticUserId = (index: number): number => -(1000 + index);
+
+export const isSyntheticUserId = (userId: number): boolean => userId < 0;

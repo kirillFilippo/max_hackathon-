@@ -19,6 +19,7 @@ import { EventService } from '../src/services/eventService.js';
 import { ItemService } from '../src/services/itemService.js';
 import { ParticipantService } from '../src/services/participantService.js';
 import { ProfileService } from '../src/services/profileService.js';
+import { DebugService } from '../src/services/debugService.js';
 import { ReminderService } from '../src/services/reminderService.js';
 import { SettlementService } from '../src/services/settlementService.js';
 import { TemplateService } from '../src/services/templateService.js';
@@ -44,6 +45,8 @@ export const testConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   webhookCheckSeconds: 60,
   sessionTtlHours: 24,
   logLevel: 'error',
+  // Отладочные команды в тестах включены: их проверяют отдельным сценарием.
+  debugCommands: true,
   ...overrides,
 });
 
@@ -119,6 +122,7 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
   const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, config);
+  const debug = new DebugService({ events, participants, items }, config);
   const sessionStore = new PgSessionStore<BotSession>(db, config.sessionTtlHours * 3_600_000);
   const notifier = makeFakeNotifier();
 
@@ -133,6 +137,7 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
     settlements,
     templates,
     reminders,
+    debug,
     notifier,
     sessions: sessionStore,
     miniapp: null,

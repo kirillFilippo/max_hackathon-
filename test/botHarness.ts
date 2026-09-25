@@ -11,6 +11,7 @@ import type { Db } from '../src/db/pool.js';
 import { PgSessionStore } from '../src/db/sessions.js';
 import { EventService } from '../src/services/eventService.js';
 import { ItemService } from '../src/services/itemService.js';
+import { DebugService } from '../src/services/debugService.js';
 import { ParticipantService } from '../src/services/participantService.js';
 import { ProfileService } from '../src/services/profileService.js';
 import { ReminderService } from '../src/services/reminderService.js';
@@ -74,8 +75,10 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const json = (body: unknown): Response =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 
-export const createBotHarness = async (): Promise<BotHarness> => {
-  const base = await startHarness();
+export const createBotHarness = async (
+  overrides: Partial<import('../src/config.js').AppConfig> = {},
+): Promise<BotHarness> => {
+  const base = await startHarness(overrides);
   const sent: SentMessage[] = [];
   /** Все показанные экраны: новые сообщения и правки — в порядке появления. */
   const screens: SentMessage[] = [];
@@ -172,6 +175,7 @@ export const createBotHarness = async (): Promise<BotHarness> => {
   const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, base.config);
+  const debug = new DebugService({ events, participants, items }, base.config);
   const notifier = createApiNotifier(bot.api);
 
   const deps: AppDeps = {
@@ -185,6 +189,7 @@ export const createBotHarness = async (): Promise<BotHarness> => {
     settlements,
     templates,
     reminders,
+    debug,
     notifier,
     sessions: sessionStore,
     miniapp: null,

@@ -6,6 +6,7 @@ import { cb, withKeyboard } from '../../message.js';
 import { fallback, helpText, mainMenu } from '../../texts/common.js';
 import { startCreateEvent } from '../drafts/createEvent.js';
 import { startRegistration } from '../drafts/register.js';
+import { debugCreateEvent, debugReceiveEvent, DEBUG_CREATE_COMMAND, DEBUG_RECEIVE_COMMAND } from '../features/debug.js';
 import { showEventList, showMainMenu } from '../features/events.js';
 import { tryAnswerFaqText } from '../features/faq.js';
 import { showFaq } from '../features/faq.js';
@@ -56,6 +57,15 @@ export const handleMessage = async (ctx: BotContext, deps: AppDeps): Promise<voi
   const startCommand = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(input);
   if (startCommand) {
     await handleStart(ctx, deps, startCommand[1] ?? null);
+    return;
+  }
+
+  // Отладочные команды текстом: клиенты MAX могут прислать их и как сообщение.
+  const debug = new RegExp(`^/(${DEBUG_CREATE_COMMAND}|${DEBUG_RECEIVE_COMMAND})(?:@[\\w_]+)?$`, 'i').exec(input);
+  if (debug) {
+    const command = debug[1]!.toLowerCase();
+    if (command === DEBUG_CREATE_COMMAND) await debugCreateEvent(ctx, deps);
+    else await debugReceiveEvent(ctx, deps);
     return;
   }
 
@@ -138,6 +148,16 @@ export const registerCommands = (bot: import('@maxhub/max-bot-api').Bot<BotConte
     }
     await startRegistration(ctx, deps, code);
   }));
+
+  if (deps.config.debugCommands) {
+    bot.command(DEBUG_CREATE_COMMAND, wrap(deps, DEBUG_CREATE_COMMAND, async (ctx) => {
+      await debugCreateEvent(ctx, deps);
+    }));
+
+    bot.command(DEBUG_RECEIVE_COMMAND, wrap(deps, DEBUG_RECEIVE_COMMAND, async (ctx) => {
+      await debugReceiveEvent(ctx, deps);
+    }));
+  }
 
   bot.command('join', wrap(deps, 'join-hint', async (ctx) => {
     await show(

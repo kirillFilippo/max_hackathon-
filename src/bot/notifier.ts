@@ -1,5 +1,6 @@
 import type { Api } from '@maxhub/max-bot-api';
 
+import { isSyntheticUserId } from '../domain/ids.js';
 import type { MessageContent } from './message.js';
 import { contentToExtra } from './context.js';
 
@@ -10,6 +11,9 @@ export interface Notifier {
 
 export const createApiNotifier = (api: Api): Notifier => ({
   sendToUser: async (userId: number, content: MessageContent) => {
+    // Синтетические участники отладочных событий в MAX не существуют: отправка
+    // вернула бы ошибку, поэтому таким пользователям сообщения не уходят.
+    if (isSyntheticUserId(userId)) return;
     await api.sendMessageToUser(userId, content.text, contentToExtra(content));
   },
 });

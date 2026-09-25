@@ -32,6 +32,11 @@ export interface AppConfig {
   webhookCheckSeconds: number;
   sessionTtlHours: number;
   logLevel: LogLevel;
+  /**
+   * Отладочные команды (/debugcreateevent, /debugreceiveevent): создают событие
+   * с синтетическими людьми. Включаются только осознанно — по умолчанию выключены.
+   */
+  debugCommands: boolean;
 }
 
 export const PLACEHOLDER_TOKENS = new Set([
@@ -102,6 +107,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     reminderTickSeconds: readNumber(env, 'REMINDER_TICK_SECONDS', 60),
     webhookCheckSeconds: readNumber(env, 'WEBHOOK_CHECK_SECONDS', 60),
     sessionTtlHours: readNumber(env, 'SESSION_TTL_HOURS', 24),
+    debugCommands: readBoolean(env, 'DEBUG_COMMANDS', false),
     logLevel: readLogLevel(env),
   };
 };

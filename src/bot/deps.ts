@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config.js';
 import type { Repositories } from '../db/repositories/index.js';
 import type { Logger } from '../logger.js';
+import type { DebugService } from '../services/debugService.js';
 import type { EventService } from '../services/eventService.js';
 import type { ItemService } from '../services/itemService.js';
 import type { ParticipantService } from '../services/participantService.js';
@@ -26,6 +27,8 @@ export interface AppDeps {
   settlements: SettlementService;
   templates: TemplateService;
   reminders: ReminderService;
+  /** Отладочные события с синтетическими людьми (команды debug*). */
+  debug: DebugService;
   notifier: Notifier;
   /** Хранилище черновиков мастеров: нужно мини-приложению, чтобы записать поля. */
   sessions: PgSessionStore<BotSession>;

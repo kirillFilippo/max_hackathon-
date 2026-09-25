@@ -23,6 +23,7 @@ import { EventService } from './services/eventService.js';
 import { ItemService } from './services/itemService.js';
 import { ParticipantService } from './services/participantService.js';
 import { ProfileService } from './services/profileService.js';
+import { DebugService } from './services/debugService.js';
 import { ReminderService } from './services/reminderService.js';
 import { SettlementService } from './services/settlementService.js';
 import { TemplateService } from './services/templateService.js';
@@ -83,6 +84,7 @@ export const createApp = async (
   const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, config);
+  const debug = new DebugService({ events, participants, items }, config);
 
   const bot = new Bot<BotContext>(config.botToken);
   const notifier = createApiNotifier(bot.api);
@@ -122,6 +124,7 @@ export const createApp = async (
     settlements,
     templates,
     reminders,
+    debug,
     notifier,
     sessions: sessionStore,
     miniapp: null,
