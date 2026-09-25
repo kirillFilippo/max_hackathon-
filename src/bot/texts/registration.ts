@@ -88,11 +88,7 @@ export const contactPrompt = (event: DosugEvent): MessageContent =>
 
 export const statusPrompt = (event: DosugEvent): MessageContent =>
   withKeyboard('Вы придёте?', [
-    [
-      cb('Иду', cbRegStatus(event.code, 'going')),
-      cb('Под вопросом', cbRegStatus(event.code, 'maybe')),
-      cb('Не смогу', cbRegStatus(event.code, 'not_going')),
-    ],
+    ...statusRow(event.code),
     [cb('Отмена', CB.regCancel)],
   ]);
 
@@ -164,6 +160,22 @@ export const registerFieldPrompt = (
   return text(lines.join('\n'));
 };
 
+/**
+ * Ряд кнопок статуса участия. Подписи и порядок одинаковы во всех экранах
+ * (приглашение, напоминание, карточка участника), поэтому собираются здесь.
+ */
+export const statusRow = (
+  code: string,
+  options: { compact?: boolean } = {},
+): KeyboardRows =>
+  options.compact
+    ? [[cb('Иду', cbRegStatus(code, 'going')), cb('Не смогу', cbRegStatus(code, 'not_going'))]]
+    : [[
+      cb('Иду', cbRegStatus(code, 'going')),
+      cb('Под вопросом', cbRegStatus(code, 'maybe')),
+      cb('Не смогу', cbRegStatus(code, 'not_going')),
+    ]];
+
 export const registerSummary = (
   event: DosugEvent,
   data: RegisterDraftData,
@@ -203,13 +215,7 @@ export const confirmReminder = (event: DosugEvent, options: { tz: string }): Mes
       '',
       'Подтвердите участие — организатору важно понимать состав.',
     ].join('\n'),
-    [
-      [
-        cb('Иду', cbRegStatus(event.code, 'going')),
-        cb('Под вопросом', cbRegStatus(event.code, 'maybe')),
-        cb('Не смогу', cbRegStatus(event.code, 'not_going')),
-      ],
-    ],
+    statusRow(event.code),
   );
 
 /** Напоминание за час: детали встречи и общий список покупок. */
@@ -235,7 +241,7 @@ export const finalReminder = (
   }
 
   return withMarkdownKeyboard(lines.join('\n'), [
-    [cb('Иду', cbRegStatus(event.code, 'going')), cb('Не смогу', cbRegStatus(event.code, 'not_going'))],
+    ...statusRow(event.code, { compact: true }),
     [cb('Список покупок', `shop:show:${event.code}`)],
   ]);
 };

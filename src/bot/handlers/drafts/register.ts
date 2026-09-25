@@ -9,7 +9,7 @@ import type { DraftState, RegisterStep } from '../../session.js';
 import { invitationCard, participantEventCard } from '../../texts/event.js';
 import { resolveAnswerMode } from '../../../domain/questionnaire.js';
 import { buildAnswersUrl } from '../../callbacks.js';
-import { answerFormCard, registrationNotice } from '../../texts/registration.js';
+import { answerFormCard, registrationNotice, statusRow } from '../../texts/registration.js';
 import { eventViewOptions } from '../features/events.js';
 import {
   botUsernameOf,
@@ -393,12 +393,7 @@ export const quickStatusChange = async (
               `Когда: ${formatDateTime(event.startsAt, deps.config.appTz)}`,
               'Вы переведены из листа ожидания в участники. Подтвердите, что придёте.',
             ].join('\n'),
-            [
-              [
-                cb('Иду', cbRegStatus(event.code, 'going')),
-                cb('Не смогу', cbRegStatus(event.code, 'not_going')),
-              ],
-            ],
+            statusRow(event.code, { compact: true }),
           ),
         );
       } catch (error) {
