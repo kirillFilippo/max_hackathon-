@@ -1,4 +1,5 @@
 import type { Repositories } from '../db/repositories/index.js';
+import { isGoing } from '../domain/stats.js';
 import { validateAnswers } from '../domain/validation.js';
 import type {
   DosugEvent,
@@ -146,7 +147,7 @@ export class ParticipantService {
     if (event.limit === null) return null;
     const participants = await this.repos.participants.listByEvent(event.id);
     const going = participants.filter(
-      (participant) => participant.status === 'going' && !participant.waitlisted,
+      isGoing,
     ).length;
     if (going >= event.limit) return null;
 

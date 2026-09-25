@@ -54,6 +54,7 @@ import {
   type MessageContent,
 } from '../message.js';
 import type { EventDraftData } from '../session.js';
+import { isGoing } from '../../domain/stats.js';
 
 export interface ViewOptions {
   tz: string;
@@ -285,7 +286,7 @@ export const participantsPanel = (
     lines.push('');
   };
 
-  renderGroup('Идут', group((p) => p.status === 'going' && !p.waitlisted));
+  renderGroup('Идут', group(isGoing));
   renderGroup('Под вопросом', group((p) => p.status === 'maybe'));
   renderGroup('Не идут', group((p) => p.status === 'not_going'));
   const waitlisted = group((p) => p.waitlisted);

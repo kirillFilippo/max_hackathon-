@@ -1,5 +1,6 @@
 import type { Repositories } from '../db/repositories/index.js';
 import { computeSettlement, type Settlement } from '../domain/money.js';
+import { isGoing } from '../domain/stats.js';
 import type {
   DosugEvent,
   ItemWithReservation,
@@ -54,7 +55,7 @@ export class SettlementService {
           paidKopecks: item.reservation?.paidKopecks ?? null,
         })),
         participants
-          .filter((participant) => participant.status === 'going' && !participant.waitlisted)
+          .filter(isGoing)
           .map((participant) => ({ userId: participant.userId, name: participant.name })),
       ),
     };

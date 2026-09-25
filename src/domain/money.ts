@@ -10,6 +10,7 @@
  * Бот только считает и показывает раскладку — платежи участники проводят сами.
  */
 
+import { normalizeUserTextTight } from './text.js';
 import type { SettlementItem } from './types.js';
 
 export interface MoneyParticipant {
@@ -166,7 +167,7 @@ export const formatRub = (kopecks: number): string => `${formatNumber(fromKopeck
 
 /** Разбирает сумму из сообщения: «350», «350,50», «1 200 ₽», «бесплатно» → null, мусор → undefined. */
 export const parsePriceKopecks = (input: string): number | null | undefined => {
-  const raw = input.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s|\u00a0/g, '');
+  const raw = normalizeUserTextTight(input);
   if (['бесплатно', 'нет', '-', '0', '0р', '0руб', 'безцены'].includes(raw)) return null;
   const match = /^(\d{1,7})(?:[.,](\d{1,2}))?(?:₽|р|руб|рублей|рубля)?$/.exec(raw);
   if (!match) return undefined;

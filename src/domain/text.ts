@@ -1,0 +1,17 @@
+/**
+ * Приведение пользовательского текста к виду для сравнения.
+ *
+ * Люди пишут «Ёлка» и «елка», «Да» и «да », ставят лишние пробелы — сравнивать
+ * это нужно одинаково во всех сценариях: разбор даты, ответ на вопрос, поиск по
+ * FAQ. Раньше нормализация была скопирована в четырёх модулях и успела разойтись.
+ */
+export const normalizeUserText = (value: string): string =>
+  value.toLowerCase().replace(/ё/g, 'е').trim();
+
+/** То же, но внутренние пробелы схлопываются: «завтра   19:00» → «завтра 19:00». */
+export const normalizeUserTextSpaces = (value: string): string =>
+  normalizeUserText(value).replace(/\s+/g, ' ');
+
+/** Вариант без пробелов вообще: «1 200,50 ₽» → «1200,50₽». */
+export const normalizeUserTextTight = (value: string): string =>
+  normalizeUserText(value).replace(/\s|\u00a0/g, '');

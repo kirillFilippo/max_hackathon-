@@ -1,3 +1,4 @@
+import { normalizeUserText, normalizeUserTextSpaces, normalizeUserTextTight } from './text.js';
 import { FIELD_TYPE_LABELS, type EventField } from './types.js';
 
 /**
@@ -16,14 +17,14 @@ const isBlank = (value: string | null | undefined): boolean =>
   value === null || value === undefined || value.trim() === '';
 
 const parseNumber = (input: string): number | null => {
-  const normalized = input.trim().replace(/\s|\u00a0/g, '').replace(',', '.');
+  const normalized = normalizeUserTextTight(input).replace(',', '.');
   if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
   const value = Number(normalized);
   return Number.isFinite(value) ? value : null;
 };
 
 const parseDate = (input: string): string | null => {
-  const raw = input.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  const raw = normalizeUserTextSpaces(input);
 
   let day: number;
   let month: number;
@@ -161,7 +162,7 @@ export const validateAnswer = (field: EventField, input: string | null | undefin
     }
 
     case 'yesno': {
-      const value = raw.trim().toLowerCase();
+      const value = normalizeUserText(raw);
       if (['да', 'yes', '+', 'true', '1'].includes(value)) return { ok: true, value: 'Да' };
       if (['нет', 'no', '-', 'false', '0'].includes(value)) return { ok: true, value: 'Нет' };
       return { ok: false, error: 'Ответьте «Да» или «Нет».' };

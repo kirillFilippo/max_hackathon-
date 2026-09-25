@@ -1,5 +1,7 @@
 import { formatDateTime, formatRelative } from '../domain/datetime.js';
 import { FAQ_ITEMS, type FaqItem } from '../domain/faq.js';
+import { goingParticipants, isGoing } from '../domain/stats.js';
+import { normalizeUserText } from '../domain/text.js';
 import { formatRub } from '../domain/money.js';
 import type {
   DosugEvent,
@@ -21,17 +23,15 @@ export interface FaqContext {
   now?: Date;
 }
 
-const normalize = (value: string): string => value.toLowerCase().replace(/ё/g, 'е').trim();
-
 /** Ищет подходящий вопрос по ключевым словам; выбирает самое длинное совпадение. */
 export const matchFaq = (input: string): FaqItem | null => {
-  const text = normalize(input);
+  const text = normalizeUserText(input);
   if (!text) return null;
 
   let best: { item: FaqItem; weight: number } | null = null;
   for (const item of FAQ_ITEMS) {
     for (const keyword of item.keywords) {
-      const normalizedKeyword = normalize(keyword);
+      const normalizedKeyword = normalizeUserText(keyword);
       if (text.includes(normalizedKeyword)) {
         const weight = normalizedKeyword.length;
         if (!best || weight > best.weight) best = { item, weight };
@@ -73,7 +73,7 @@ export const answerFaq = (item: FaqItem, context: FaqContext): string => {
     }
     case 'who': {
       const going = participants.filter(
-        (participant) => participant.status === 'going' && !participant.waitlisted,
+        isGoing,
       );
       if (going.length === 0) return 'Пока никто не подтвердил участие.';
       const names = going.slice(0, 12).map((participant) => participant.name).join(', ');
@@ -83,7 +83,7 @@ export const answerFaq = (item: FaqItem, context: FaqContext): string => {
     case 'limit': {
       if (event.limit === null) return 'Лимита нет, можно присоединяться.';
       const going = stats?.going
-        ?? participants.filter((p) => p.status === 'going' && !p.waitlisted).length;
+        ?? goingParticipants(participants).length;
       const free = Math.max(event.limit - going, 0);
       return free > 0
         ? `Лимит ${event.limit}, свободно ${free} мест.`

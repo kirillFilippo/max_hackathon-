@@ -10,6 +10,9 @@ data
 !.env.example
 test
 scripts
+docs
+.deploy
+.github
 .tmp-tests
 certs/*.pem
 certs/*.crt

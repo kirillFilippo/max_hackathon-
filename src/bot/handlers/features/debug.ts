@@ -4,6 +4,7 @@ import type { DebugScenario } from '../../../services/debugService.js';
 import { cb, withKeyboard } from '../../message.js';
 import { menuRow, requireUser } from '../helpers.js';
 import { openEventForParticipant, showEventCard } from './events.js';
+import { isGoing } from '../../../domain/stats.js';
 
 /**
  * Отладочные команды: быстро получить событие с людьми.
@@ -21,7 +22,7 @@ export const DEBUG_RECEIVE_COMMAND = 'debugreceiveevent';
 
 const scenarioSummary = (scenario: DebugScenario): string => {
   const going = scenario.participants.filter(
-    (item) => item.status === 'going' && !item.waitlisted,
+    isGoing,
   ).length;
   const waiting = scenario.participants.filter((item) => item.waitlisted).length;
   const maybe = scenario.participants.filter((item) => item.status === 'maybe').length;
