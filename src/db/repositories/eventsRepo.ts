@@ -91,8 +91,12 @@ export class EventsRepo implements EventsRepository {
         );
         return mapEvent(row.rows[0]!);
       } catch (error) {
-        // 23505 = unique_violation: код занят, пробуем ещё раз.
-        if ((error as { code?: string }).code === '23505' && attempt < attempts - 1) continue;
+        // 23505 = unique_violation. Повторяем только конфликт по короткому коду:
+        // если это столкновение первичных ключей, новый код проблему не решит.
+        const conflict = error as { code?: string; constraint?: string };
+        const codeTaken = conflict.code === '23505'
+          && (conflict.constraint === undefined || conflict.constraint === 'events_code_key');
+        if (codeTaken && attempt < attempts - 1) continue;
         throw error;
       }
     }

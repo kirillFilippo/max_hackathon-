@@ -14,7 +14,7 @@ import {
 import type { DraftState } from '../../session.js';
 import { placeConfirm, placePrompt } from '../../texts/event.js';
 import { cbEventCard } from '../../callbacks.js';
-import { notifyParticipants, userIdOf } from '../helpers.js';
+import { findEventByIdOrNotify, menuRow, notifyParticipants, userIdOf } from '../helpers.js';
 import { callbackArgs } from './fieldsScreen.js';
 
 export type EditEventDraft = Extract<DraftState, { kind: 'edit-event' }>;
@@ -54,15 +54,14 @@ export const handleEditEventDraft = async (
   deps: AppDeps,
   draft: EditEventDraft,
 ): Promise<boolean> => {
-  const event = await deps.events.findById(draft.eventId);
+  const event = await findEventByIdOrNotify(ctx, deps, draft.eventId);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
-    await show(ctx, withKeyboard('Событие не найдено.', [[cb('В меню', 'menu:main')]]));
     return true;
   }
 
   const isCallback = ctx.updateType === 'message_callback';
-    const { action, args } = callbackArgs(ctx);
+  const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
   const applyEdit = async (patch: Record<string, unknown>): Promise<void> => {

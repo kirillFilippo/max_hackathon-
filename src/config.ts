@@ -36,6 +36,8 @@ export interface AppConfig {
   reminderConfirmHours: number;
   reminderFinalHours: number;
   reminderTickSeconds: number;
+  /** Через сколько часов после начала событие закрывается автоматически. */
+  eventStaleHours: number;
   /** Как часто проверять, что подписка на вебхук жива (режим webhook). */
   webhookCheckSeconds: number;
   sessionTtlHours: number;
@@ -124,6 +126,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     reminderConfirmHours: readNumber(env, 'REMINDER_CONFIRM_HOURS', 48),
     reminderFinalHours: readNumber(env, 'REMINDER_FINAL_HOURS', 1),
     reminderTickSeconds: readNumber(env, 'REMINDER_TICK_SECONDS', 60),
+    eventStaleHours: readNumber(env, 'EVENT_STALE_HOURS', 3),
     webhookCheckSeconds: readNumber(env, 'WEBHOOK_CHECK_SECONDS', 60),
     sessionTtlHours: readNumber(env, 'SESSION_TTL_HOURS', 24),
     debugCommands: readBoolean(env, 'DEBUG_COMMANDS', false),

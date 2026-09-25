@@ -51,7 +51,7 @@ import {
   startEditRegistration,
 } from '../drafts/register.js';
 import { editMenu } from '../../texts/event.js';
-import { menuRow } from '../helpers.js';
+import { findEventOrNotify, menuRow } from '../helpers.js';
 
 /** Обработка кнопок вне активного мастера. */
 export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
@@ -113,20 +113,14 @@ export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<vo
           await showEventDetails(ctx, deps, code);
           return;
         case 'edit': {
-          const event = await deps.events.findByCode(code);
-          if (!event) {
-            await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-            return;
-          }
+          const event = await findEventOrNotify(ctx, deps, code);
+          if (!event) return;
           await show(ctx, editMenu(event));
           return;
         }
         case 'set': {
-          const event = await deps.events.findByCode(code);
-          if (!event) {
-            await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-            return;
-          }
+          const event = await findEventOrNotify(ctx, deps, code);
+          if (!event) return;
           await startEditField(ctx, deps, event.id, extra as 'title' | 'startsAt' | 'place' | 'description' | 'limit');
           return;
         }
@@ -283,11 +277,8 @@ export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<vo
       // которую организатор может переопределить.
       const [sub, scope = '', mode = ''] = args;
       if (scope === 'draft') return;
-      const event = await deps.events.findByCode(scope);
-      if (!event) {
-        await show(ctx, withKeyboard(`Событие ${scope} не найдено.`, menuRow));
-        return;
-      }
+      const event = await findEventOrNotify(ctx, deps, scope);
+      if (!event) return;
       if (event.organizerId !== ctx.user?.user_id) {
         await show(ctx, withKeyboard('Менять способ ответа может только организатор.', menuRow));
         return;

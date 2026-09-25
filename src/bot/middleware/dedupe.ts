@@ -1,3 +1,4 @@
+import { startCommandPayload } from '../../domain/links.js';
 import { createHash } from 'node:crypto';
 
 import type { MiddlewareFn } from '@maxhub/max-bot-api';
@@ -76,8 +77,7 @@ const startActionKey = (type: string, update: SlimUpdate): string | null => {
   if (type === 'bot_started') return (update.payload ?? '').trim();
   if (type !== 'message_created') return null;
   const text = update.message?.body?.text?.trim() ?? '';
-  const match = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(text);
-  return match ? (match[1] ?? '') : null;
+  return startCommandPayload(text);
 };
 
 /**

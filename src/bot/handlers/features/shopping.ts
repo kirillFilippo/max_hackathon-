@@ -5,23 +5,14 @@ import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import { listReadyNotification, myItems, reserveResult, shoppingList } from '../../texts/shopping.js';
-import { menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
-
-const loadEvent = async (ctx: BotContext, deps: AppDeps, code: string): Promise<DosugEvent | null> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return null;
-  }
-  return event;
-};
+import { findEventOrNotify, menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
 
 export const showShoppingList = async (
   ctx: BotContext,
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   const items = await deps.items.list(event.id);
   await show(
@@ -35,7 +26,7 @@ export const showMyItems = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   const items = await deps.items.mine(event.id, userIdOf(ctx));
   await show(ctx, myItems(event, items));
@@ -48,7 +39,7 @@ export const takeItem = async (
   code: string,
   itemId: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   const user = requireUser(ctx);
   const result = await deps.items.reserveItem(event, itemId, user.user_id, user.name);
@@ -72,7 +63,7 @@ export const releaseItem = async (
   code: string,
   itemId: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   await deps.items.release(itemId, userIdOf(ctx));
   const items = await deps.items.mine(event.id, userIdOf(ctx));
@@ -104,7 +95,7 @@ export const notifyShoppingList = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   if (event.organizerId !== userIdOf(ctx)) {
     await show(ctx, withKeyboard('Рассылать список может только организатор.', menuRow));

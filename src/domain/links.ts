@@ -37,3 +37,13 @@ export const eventCodeFromStartPayload = (payload: string | null | undefined): s
   }
   return null;
 };
+
+/**
+ * Разбирает текст команды `/start` (в том числе `/start@Бот payload`).
+ * Возвращает payload или null, если это не команда запуска: одна реализация
+ * используется и роутером сообщений, и дедупликатором входов.
+ */
+export const startCommandPayload = (text: string): string | null => {
+  const match = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(text.trim());
+  return match ? (match[1] ?? '') : null;
+};

@@ -11,7 +11,14 @@ import { resolveAnswerMode } from '../../../domain/questionnaire.js';
 import { buildAnswersUrl } from '../../callbacks.js';
 import { answerFormCard, registrationNotice } from '../../texts/registration.js';
 import { eventViewOptions } from '../features/events.js';
-import { botUsernameOf, menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
+import {
+  botUsernameOf,
+  findEventOrNotify,
+  menuRow,
+  notifyParticipants,
+  requireUser,
+  userIdOf,
+} from '../helpers.js';
 import { callbackArgs } from './fieldsScreen.js';
 import {
   contactPrompt,
@@ -150,11 +157,8 @@ export const startRegistration = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   if (event.status === 'closed') {
     await show(
       ctx,
@@ -219,11 +223,8 @@ export const beginRegistration = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   if (event.status === 'closed') {
     await show(
       ctx,
@@ -278,11 +279,8 @@ export const confirmRegistrationButton = async (
     return;
   }
 
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
 
   const user = requireUser(ctx);
   const existing = await deps.participants.find(event.id, user.user_id);
@@ -310,11 +308,8 @@ export const startEditRegistration = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const userId = userIdOf(ctx);
   const existing = await deps.participants.find(event.id, userId);
   if (!existing || !ctx.session) {
@@ -350,11 +345,8 @@ export const quickStatusChange = async (
   code: string,
   status: ParticipantStatus,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const user = requireUser(ctx);
   const existing = await deps.participants.find(event.id, user.user_id);
 
@@ -479,13 +471,12 @@ export const handleRegisterDraft = async (
   draft: RegisterDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-    const { action, args } = callbackArgs(ctx);
+  const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
-  const event = await deps.events.findByCode(draft.data.eventCode);
+  const event = await findEventOrNotify(ctx, deps, draft.data.eventCode);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
-    await show(ctx, withKeyboard(`Событие с кодом ${draft.data.eventCode} не найдено.`, menuRow));
     return true;
   }
 

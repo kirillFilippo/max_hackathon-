@@ -157,7 +157,7 @@ export const handleCreateEventDraft = async (
   draft: CreateEventDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-    const { action, args } = callbackArgs(ctx);
+  const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
   if (isCallback && action === 'draft' && args[0] === 'back') {

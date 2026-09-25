@@ -1,5 +1,6 @@
 import { normalizeCode } from '../../../domain/ids.js';
-import { eventCodeFromStartPayload, CB } from '../../callbacks.js';
+import { CB } from '../../callbacks.js';
+import { eventCodeFromStartPayload, startCommandPayload } from '../../../domain/links.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
@@ -13,7 +14,7 @@ import { showFaq } from '../features/faq.js';
 import { showTemplates } from '../features/templates.js';
 import { showDuties } from '../features/money.js';
 import { showProfile } from '../features/profile.js';
-import { userIdOf } from '../helpers.js';
+import { userIdOf, withErrorHandling } from '../helpers.js';
 
 /** Вход в бота: по ссылке-приглашению (payload) или обычный. */
 export const handleBotStarted = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
@@ -54,9 +55,9 @@ export const handleMessage = async (ctx: BotContext, deps: AppDeps): Promise<voi
 
   // `/start` и `/start@Бот`: команда уже обработана выше, но у разных клиентов
   // MAX текст может прийти и сюда — тогда отвечаем тем же путём, без дублей.
-  const startCommand = /^\/start(?:@[\w_]+)?(?:\s+(\S+))?$/i.exec(input);
-  if (startCommand) {
-    await handleStart(ctx, deps, startCommand[1] ?? null);
+  const startPayload = startCommandPayload(input);
+  if (startPayload !== null) {
+    await handleStart(ctx, deps, startPayload === '' ? null : startPayload);
     return;
   }
 
@@ -88,19 +89,11 @@ const wrap = (
   deps: AppDeps,
   scope: string,
   handler: (ctx: BotContext) => Promise<unknown>,
-): ((ctx: BotContext) => Promise<void>) => {
-  return async (ctx: BotContext) => {
-    try {
-      await handler(ctx);
-    } catch (error) {
-      deps.logger.error(`Ошибка в команде ${scope}`, error);
-      await show(
-        ctx,
-        withKeyboard('Не получилось выполнить команду. Попробуйте ещё раз.', [[cb('В меню', CB.menuMain)]]),
-      ).catch(() => undefined);
-    }
-  };
-};
+): ((ctx: BotContext) => Promise<void>) =>
+  withErrorHandling(deps, scope, handler, {
+    kind: 'команде',
+    message: 'Не получилось выполнить команду. Попробуйте ещё раз.',
+  });
 
 export const registerCommands = (bot: import('@maxhub/max-bot-api').Bot<BotContext>, deps: AppDeps): void => {
   bot.command('start', wrap(deps, 'start', async (ctx) => {

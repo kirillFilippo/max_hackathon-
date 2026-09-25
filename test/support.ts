@@ -42,6 +42,7 @@ export const testConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   reminderConfirmHours: 48,
   reminderFinalHours: 1,
   reminderTickSeconds: 60,
+  eventStaleHours: 3,
   webhookCheckSeconds: 60,
   sessionTtlHours: 24,
   logLevel: 'error',

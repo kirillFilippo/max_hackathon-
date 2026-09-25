@@ -35,7 +35,7 @@ export class ReminderService {
 
   async due(now: Date = new Date()): Promise<ReminderTick> {
     const closedEvents = await this.repos.events.closeStartedBefore(
-      new Date(now.getTime() - 3 * 3_600_000),
+      new Date(now.getTime() - this.config.eventStaleHours * 3_600_000),
     );
 
     const events = await this.repos.events.listPublished();

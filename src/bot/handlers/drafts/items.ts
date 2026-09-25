@@ -5,7 +5,7 @@ import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
 import { addItemsPrompt, itemPricePrompt, myItems, reserveNumbersPrompt, reserveResult, shoppingList } from '../../texts/shopping.js';
-import { menuRow, userIdOf } from '../helpers.js';
+import { findEventByIdOrNotify, findEventOrNotify, menuRow, userIdOf } from '../helpers.js';
 import { reserveByNumbersText } from '../features/shopping.js';
 
 export type ItemsAddDraft = Extract<DraftState, { kind: 'items-add' }>;
@@ -18,11 +18,8 @@ export const startAddItems = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   if (event.organizerId !== userIdOf(ctx)) {
     await show(ctx, withKeyboard('Добавлять позиции может только организатор.', menuRow));
     return;
@@ -38,10 +35,9 @@ export const handleItemsAddDraft = async (
   draft: ItemsAddDraft,
 ): Promise<boolean> => {
   const input = userText(ctx);
-  const event = await deps.events.findById(draft.eventId);
+  const event = await findEventByIdOrNotify(ctx, deps, draft.eventId);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
-    await show(ctx, withKeyboard('Событие не найдено.', menuRow));
     return true;
   }
 
@@ -68,11 +64,8 @@ export const startReserveNumbers = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const items = await deps.items.list(event.id);
   if (items.length === 0) {
     await show(ctx, withKeyboard('Список покупок пока пуст.', menuRow));
@@ -88,10 +81,9 @@ export const handleItemReserveDraft = async (
   deps: AppDeps,
   draft: ItemReserveDraft,
 ): Promise<boolean> => {
-  const event = await deps.events.findById(draft.eventId);
+  const event = await findEventByIdOrNotify(ctx, deps, draft.eventId);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
-    await show(ctx, withKeyboard('Событие не найдено.', menuRow));
     return true;
   }
   if (ctx.session) ctx.session.draft = null;
@@ -112,11 +104,8 @@ export const startItemPrice = async (
   code: string,
   itemId: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const item = await deps.items.find(itemId);
   if (!item || item.eventId !== event.id) {
     await show(ctx, withKeyboard('Позиция не найдена.', menuRow));
@@ -142,10 +131,9 @@ export const handleItemPriceDraft = async (
   deps: AppDeps,
   draft: ItemPriceDraft,
 ): Promise<boolean> => {
-  const event = await deps.events.findByCode(draft.eventCode);
+  const event = await findEventOrNotify(ctx, deps, draft.eventCode);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
-    await show(ctx, withKeyboard('Событие не найдено.', menuRow));
     return true;
   }
   const input = userText(ctx);

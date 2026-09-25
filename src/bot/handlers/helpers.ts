@@ -1,7 +1,7 @@
 import type { Context } from '@maxhub/max-bot-api';
 
 import type { DosugEvent } from '../../domain/types.js';
-import { replyTo, type BotContext } from '../context.js';
+import { replyTo, show, type BotContext } from '../context.js';
 import type { AppDeps } from '../deps.js';
 import { menuRow, withKeyboard, type MessageContent } from '../message.js';
 
@@ -20,22 +20,56 @@ export const userIdOf = (ctx: BotContext): number => requireUser(ctx).user_id;
 export const botUsernameOf = (ctx: BotContext, deps: AppDeps): string | undefined =>
   ctx.botInfo?.username ?? deps.config.botUsername;
 
-/** Обёртка обработчика: ошибка логируется, пользователь получает понятный ответ. */
+/**
+ * Находит событие по коду; если его нет — отвечает пользователю и возвращает null.
+ * Раньше этот блок с одинаковым текстом был скопирован в тринадцати местах.
+ */
+export const findEventOrNotify = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  code: string,
+): Promise<DosugEvent | null> => {
+  const event = await deps.events.findByCode(code);
+  if (!event) {
+    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
+    return null;
+  }
+  return event;
+};
+
+/** То же для мастера, где событие уже известно по id, а не по коду. */
+export const findEventByIdOrNotify = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  eventId: string,
+): Promise<DosugEvent | null> => {
+  const event = await deps.events.findById(eventId);
+  if (!event) {
+    await show(ctx, withKeyboard('Событие не найдено.', menuRow));
+    return null;
+  }
+  return event;
+};
+
+/**
+ * Обёртка обработчика: ошибка логируется, пользователь получает понятный ответ.
+ * Одна на команды и на обработчики кнопок — отличается только текст сообщения.
+ */
 export const withErrorHandling = (
   deps: AppDeps,
   scope: string,
   handler: (ctx: BotContext) => Promise<unknown>,
+  options: { message?: string; kind?: string } = {},
 ): ((ctx: BotContext) => Promise<void>) => {
+  const kind = options.kind ?? 'обработчике';
+  const message = options.message ?? 'Не получилось выполнить действие. Попробуйте ещё раз.';
   return async (ctx: BotContext) => {
     try {
       await handler(ctx);
     } catch (error) {
-      deps.logger.error(`Ошибка в обработчике ${scope}`, error);
+      deps.logger.error(`Ошибка в ${kind} ${scope}`, error);
       try {
-        await replyTo(
-          ctx,
-          withKeyboard('Не получилось выполнить действие. Попробуйте ещё раз.', menuRow),
-        );
+        await replyTo(ctx, withKeyboard(message, menuRow));
       } catch (secondary) {
         deps.logger.error('Не удалось отправить сообщение об ошибке', secondary);
       }

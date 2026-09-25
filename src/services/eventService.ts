@@ -120,8 +120,8 @@ export class EventService {
     return this.repos.events.update(id, { status: 'closed', closedAt: new Date().toISOString() });
   }
 
-  /** Автоматически закрывает события, которые начались больше `staleHours` назад. */
-  async closeExpired(now: Date, staleHours = 3): Promise<DosugEvent[]> {
+  /** Автоматически закрывает события, которые начались больше `EVENT_STALE_HOURS` назад. */
+  async closeExpired(now: Date, staleHours = this.config.eventStaleHours): Promise<DosugEvent[]> {
     const threshold = new Date(now.getTime() - staleHours * 3_600_000);
     return this.repos.events.closeStartedBefore(threshold);
   }

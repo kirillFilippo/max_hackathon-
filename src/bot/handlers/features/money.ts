@@ -14,20 +14,7 @@ import {
   settlementPanel,
   transferDebtorCard,
 } from '../../texts/money.js';
-import { menuRow, sendToUser, userIdOf } from '../helpers.js';
-
-const loadEvent = async (
-  ctx: BotContext,
-  deps: AppDeps,
-  code: string,
-): Promise<DosugEvent | null> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return null;
-  }
-  return event;
-};
+import { findEventOrNotify, menuRow, sendToUser, userIdOf } from '../helpers.js';
 
 const nameResolver = (participants: Array<{ userId: number; name: string }>) => {
   const map = new Map(participants.map((participant) => [participant.userId, participant.name]));
@@ -40,7 +27,7 @@ export const showSettlement = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   const view = await deps.settlements.view(event);
   const requests = await deps.settlements.listByEvent(event.id);
@@ -60,7 +47,7 @@ export const requestTransfers = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await loadEvent(ctx, deps, code);
+  const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
   if (event.organizerId !== userIdOf(ctx)) {
     await show(ctx, withKeyboard('Создавать запросы может только организатор.', menuRow));

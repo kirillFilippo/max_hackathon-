@@ -36,7 +36,7 @@ export const handleNewTemplateDraft = async (
   draft: NewTemplateDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-    const { action, args } = callbackArgs(ctx);
+  const { action, args } = callbackArgs(ctx);
 
   if (draft.step === 'name') {
     const input = userText(ctx);
@@ -145,7 +145,7 @@ export const handleEditTemplateDraft = async (
   draft: EditTemplateDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-    const { action, args } = callbackArgs(ctx);
+  const { action, args } = callbackArgs(ctx);
 
   if (!draft.editor && isCallback && action === 'draft' && args[0] === 'skip') {
     const updated = await deps.templates.updateFields(draft.templateId, userIdOf(ctx), draft.fields);

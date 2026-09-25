@@ -97,13 +97,11 @@ export const answerModeScreen = (
   mode: AnswerMode,
 ): MessageContent => {
   const effective = resolveAnswerMode(fields, mode);
-  const labels: Record<AnswerMode, string> = {
-    auto: ANSWER_MODE_LABELS.auto,
-    chat: ANSWER_MODE_LABELS.chat,
-    miniapp: ANSWER_MODE_LABELS.miniapp,
-  };
   const rows = (['auto', 'chat', 'miniapp'] as AnswerMode[]).map((value) => [
-    cb(`${value === mode ? '• ' : ''}${labels[value]}`, cbQuestionsModeSet(scope, value)),
+    cb(
+      `${value === mode ? '• ' : ''}${ANSWER_MODE_LABELS[value]}`,
+      cbQuestionsModeSet(scope, value),
+    ),
   ]);
   // Возврат ведёт туда, откуда пришли: у черновика — к списку вопросов, у события — к карточке.
   rows.push([

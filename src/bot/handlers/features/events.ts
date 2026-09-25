@@ -14,7 +14,14 @@ import {
   participantsPanel,
 } from '../../texts/event.js';
 import { confirmReminder } from '../../texts/registration.js';
-import { botUsernameOf, menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
+import {
+  botUsernameOf,
+  findEventOrNotify,
+  menuRow,
+  notifyParticipants,
+  requireUser,
+  userIdOf,
+} from '../helpers.js';
 
 export const eventViewOptions = (ctx: BotContext, deps: AppDeps): { tz: string; botUsername?: string } => ({
   tz: deps.config.appTz,
@@ -38,11 +45,8 @@ const requireOwnEvent = async (
   deps: AppDeps,
   code: string,
 ): Promise<DosugEvent | null> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return null;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return null;
   if (event.organizerId !== userIdOf(ctx)) {
     await show(ctx, withKeyboard('Это событие создал другой организатор, управлять им нельзя.', menuRow));
     return null;
@@ -55,11 +59,8 @@ export const showEventCard = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   if (ctx.session) ctx.session.lastEventCode = event.code;
   const [participants, items] = await Promise.all([
     deps.participants.listByEvent(event.id),
@@ -91,11 +92,8 @@ export const showEventDetails = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const [participants, items] = await Promise.all([
     deps.participants.listByEvent(event.id),
     deps.items.list(event.id),
@@ -108,11 +106,8 @@ export const showInviteLink = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const options = eventViewOptions(ctx, deps);
   const linkUrl = deps.events.inviteLink(event, options.botUsername);
   await show(
@@ -171,11 +166,8 @@ export const openEventForParticipant = async (
   deps: AppDeps,
   code: string,
 ): Promise<void> => {
-  const event = await deps.events.findByCode(code);
-  if (!event) {
-    await show(ctx, withKeyboard(`Событие ${code} не найдено.`, menuRow));
-    return;
-  }
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return;
   const user = requireUser(ctx);
   const [participant, items] = await Promise.all([
     deps.participants.find(event.id, user.user_id),
