@@ -2,6 +2,7 @@ import { newTransferId } from '../../domain/ids.js';
 import type { TransferMode, TransferRequest, TransferStatus } from '../../domain/types.js';
 import { toIso, toIsoOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { TransferPatch, TransfersRepository } from './contracts.js';
 
 interface TransferRow {
   id: string;
@@ -35,18 +36,8 @@ const mapTransfer = (row: TransferRow): TransferRequest => ({
   closedAt: toIsoOrNull(row.closed_at),
 });
 
-export interface TransferPatch {
-  amountKopecks?: number;
-  mode?: TransferMode;
-  status?: TransferStatus;
-  notifiedAt?: string | null;
-  detailsSentAt?: string | null;
-  paidAt?: string | null;
-  closedAt?: string | null;
-}
-
 /** Запросы на расчёт: кто кому сколько должен и на каком этапе передача денег. */
-export class TransfersRepo {
+export class TransfersRepo implements TransfersRepository {
   constructor(private readonly db: Db) {}
 
   /**

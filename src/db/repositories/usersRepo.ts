@@ -1,6 +1,7 @@
 import type { UserProfile } from '../../domain/types.js';
 import { toIso } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { UserPatch, UsersRepository } from './contracts.js';
 
 interface UserRow {
   user_id: number;
@@ -22,17 +23,11 @@ const mapUser = (row: UserRow): UserProfile => ({
   paymentHandle: row.payment_handle,
 });
 
-export interface UserPatch {
-  name?: string;
-  username?: string | null;
-  contact?: string;
-}
-
 /**
  * Профили пользователей. Живут в БД, поэтому контакт и реквизиты для перевода
  * не теряются при перезапуске бота и деплое.
  */
-export class UsersRepo {
+export class UsersRepo implements UsersRepository {
   constructor(private readonly db: Db) {}
 
   async ensure(userId: number, patch: UserPatch = {}): Promise<UserProfile> {

@@ -5,6 +5,14 @@ import type { LogLevel } from './logger.js';
 
 export type BotMode = 'polling' | 'webhook';
 
+/**
+ * Откуда берутся данные.
+ * `auto` — PostgreSQL, а при обрыве связи память процесса с последующей
+ * синхронизацией; `postgres` — строго база (без неё бот не стартует);
+ * `memory` — только память, база не используется (демо и локальные прогоны).
+ */
+export type StorageMode = 'auto' | 'postgres' | 'memory';
+
 export interface AppConfig {
   /** Токен бота MAX. Обязателен для запуска в MAX, не нужен для тестов. */
   botToken: string;
@@ -32,12 +40,23 @@ export interface AppConfig {
   webhookCheckSeconds: number;
   sessionTtlHours: number;
   logLevel: LogLevel;
+  storageMode: StorageMode;
+  /** Как часто проверять, что база на месте, и напоминать об обрыве. */
+  storageCheckSeconds: number;
+  /** Файл со снимком памяти на время обрыва связи; пусто — не сохранять. */
+  offlineStatePath: string;
   /**
    * Отладочные команды (/debugcreateevent, /debugreceiveevent): создают событие
    * с синтетическими людьми. Включаются только осознанно — по умолчанию выключены.
    */
   debugCommands: boolean;
 }
+
+const readStorageMode = (env: NodeJS.ProcessEnv): StorageMode => {
+  const raw = readString(env, 'STORAGE_MODE', 'auto').toLowerCase();
+  if (raw === 'postgres' || raw === 'memory') return raw;
+  return 'auto';
+};
 
 export const PLACEHOLDER_TOKENS = new Set([
   '',
@@ -108,6 +127,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     webhookCheckSeconds: readNumber(env, 'WEBHOOK_CHECK_SECONDS', 60),
     sessionTtlHours: readNumber(env, 'SESSION_TTL_HOURS', 24),
     debugCommands: readBoolean(env, 'DEBUG_COMMANDS', false),
+    storageMode: readStorageMode(env),
+    storageCheckSeconds: readNumber(env, 'STORAGE_CHECK_SECONDS', 30),
+    offlineStatePath: readString(env, 'OFFLINE_STATE_PATH', 'data/offline-state.json'),
     logLevel: readLogLevel(env),
   };
 };

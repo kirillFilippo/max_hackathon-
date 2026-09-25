@@ -76,6 +76,8 @@ export interface MiniappDeps {
   botToken: string;
   /** Локальная отладка: разрешает работу без подписи (не включать в проде). */
   devMode: boolean;
+  /** Состояние хранилища для /health: режим, обрыв связи, очередь синхронизации. */
+  health?: () => Record<string, unknown>;
   getQuestionnaire: (code: string, userId: number | null) => Promise<QuestionnairePayload | null>;
   saveAnswers: (submission: AnswerSubmission) => Promise<AnswerSaveResult>;
   /** Проверяет одноразовую подпись мастера (или null, если она истекла/неизвестна). */
@@ -382,7 +384,9 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
       }
 
       if (req.method === 'GET' && url.pathname === '/health') {
-        json(res, 200, { ok: true });
+        // /health отвечает всегда, даже когда база недоступна: по нему видно,
+        // что бот жив и работает в запасном режиме.
+        json(res, 200, deps.health ? deps.health() : { ok: true });
         return;
       }
 

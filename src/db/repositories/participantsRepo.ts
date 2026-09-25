@@ -2,6 +2,7 @@ import { newParticipantId } from '../../domain/ids.js';
 import type { Participant, ParticipantStatus } from '../../domain/types.js';
 import { toIso, toIsoOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { ParticipantPatch, ParticipantsRepository, SaveParticipantInput } from './contracts.js';
 
 interface ParticipantRow {
   id: string;
@@ -35,29 +36,7 @@ const mapParticipant = (row: ParticipantRow): Participant => ({
   updatedAt: toIso(row.updated_at),
 });
 
-export interface SaveParticipantInput {
-  eventId: string;
-  userId: number;
-  name: string;
-  username: string | null;
-  contact: string;
-  status: ParticipantStatus;
-  answers: Record<string, string>;
-  waitlisted: boolean;
-}
-
-export interface ParticipantPatch {
-  name?: string;
-  username?: string | null;
-  contact?: string;
-  status?: ParticipantStatus;
-  answers?: Record<string, string>;
-  waitlisted?: boolean;
-  confirmSentAt?: string | null;
-  finalSentAt?: string | null;
-}
-
-export class ParticipantsRepo {
+export class ParticipantsRepo implements ParticipantsRepository {
   constructor(private readonly db: Db) {}
 
   async upsert(input: SaveParticipantInput): Promise<Participant> {

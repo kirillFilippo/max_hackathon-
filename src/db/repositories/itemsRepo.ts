@@ -2,6 +2,7 @@ import { newItemId } from '../../domain/ids.js';
 import type { EventItem, ItemWithReservation, Reservation } from '../../domain/types.js';
 import { toIso, toIsoOrNull, toNumberOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { ItemsRepository, ReserveResult } from './contracts.js';
 
 interface ItemRow {
   id: string;
@@ -53,20 +54,12 @@ const mapItem = (row: ItemRow): ItemWithReservation => {
   return { ...item, reservation };
 };
 
-export interface ReserveResult {
-  reserved: ItemWithReservation | null;
-  /** Имя того, кто уже занял позицию (если заняли не мы). */
-  takenBy: string | null;
-  /** true, если позиция уже была забронирована этим же пользователем. */
-  alreadyMine: boolean;
-}
-
 /**
  * Список покупок: позиции и брони. Одна позиция — одна бронь; конфликт
  * разрешается на уровне БД (reservations.item_id — первичный ключ), поэтому
  * одновременные нажатия не создадут две брони на один предмет.
  */
-export class ItemsRepo {
+export class ItemsRepo implements ItemsRepository {
   constructor(private readonly db: Db) {}
 
   async addMany(eventId: string, titles: string[]): Promise<ItemWithReservation[]> {

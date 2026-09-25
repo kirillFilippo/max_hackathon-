@@ -2,6 +2,7 @@ import { newTemplateId } from '../../domain/ids.js';
 import type { EventField, Template } from '../../domain/types.js';
 import { toIso } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { TemplatesRepository } from './contracts.js';
 
 interface TemplateRow {
   id: string;
@@ -20,7 +21,7 @@ const mapTemplate = (row: TemplateRow): Template => ({
   createdAt: toIso(row.created_at),
 });
 
-export class TemplatesRepo {
+export class TemplatesRepo implements TemplatesRepository {
   constructor(private readonly db: Db) {}
 
   async listByOwner(ownerId: number): Promise<Template[]> {

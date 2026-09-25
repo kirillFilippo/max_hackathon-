@@ -7,17 +7,15 @@ import { TransfersRepo } from './transfersRepo.js';
 import { UsersRepo } from './usersRepo.js';
 
 export { EventsRepo, ItemsRepo, ParticipantsRepo, TemplatesRepo, TransfersRepo, UsersRepo };
+export * from './contracts.js';
 
-/** Набор репозиториев — единственная точка доступа сервисов к базе. */
-export interface Repositories {
-  users: UsersRepo;
-  events: EventsRepo;
-  items: ItemsRepo;
-  participants: ParticipantsRepo;
-  templates: TemplatesRepo;
-  transfers: TransfersRepo;
-}
+import type { Repositories } from './contracts.js';
 
+/**
+ * Реализация хранилища на PostgreSQL. Сервисы работают с интерфейсами
+ * (`contracts.ts`), поэтому ту же роль может играть память — см. `db/memory`
+ * и `db/resilient`.
+ */
 export const createRepositories = (db: Db): Repositories => ({
   users: new UsersRepo(db),
   events: new EventsRepo(db),

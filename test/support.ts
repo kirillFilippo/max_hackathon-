@@ -47,6 +47,10 @@ export const testConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   logLevel: 'error',
   // Отладочные команды в тестах включены: их проверяют отдельным сценарием.
   debugCommands: true,
+  // В тестах база поднимается локально, запасной режим не нужен.
+  storageMode: 'postgres',
+  storageCheckSeconds: 30,
+  offlineStatePath: '',
   ...overrides,
 });
 

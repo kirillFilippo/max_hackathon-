@@ -13,10 +13,9 @@ import {
   type WatchdogHandle,
 } from './bot/subscriptionWatchdog.js';
 import { assertRunnableConfig, type AppConfig } from './config.js';
-import { migrate } from './db/migrate.js';
-import { createDb, type Db } from './db/pool.js';
-import { createRepositories } from './db/repositories/index.js';
-import { PgSessionStore } from './db/sessions.js';
+import type { Db } from './db/pool.js';
+import type { PgSessionStore } from './db/sessions.js';
+import { createStorage } from './db/storage.js';
 import { newFieldId } from './domain/ids.js';
 import { createLogger, type Logger } from './logger.js';
 import { EventService } from './services/eventService.js';
@@ -61,21 +60,12 @@ export const createApp = async (
   config: AppConfig,
   logger: Logger = createLogger(config.logLevel),
 ): Promise<AppHandle> => {
-  const db = createDb(
-    {
-      connectionString: config.databaseUrl,
-      maxConnections: config.databasePoolSize,
-      ssl: config.databaseSsl,
-    },
-    logger,
-  );
-  await db.ping();
-  await migrate(db, logger);
-
-  const repos = createRepositories(db);
-  const sessionStore = new PgSessionStore<BotSession>(db, config.sessionTtlHours * 3_600_000);
-  const removedSessions = await sessionStore.cleanupExpired();
-  if (removedSessions > 0) logger.info(`Удалено просроченных сессий: ${removedSessions}`);
+  // Хранилище само решает, откуда брать данные: PostgreSQL, память или оба
+  // (при обрыве связи бот продолжает работать и синхронизируется позже).
+  const storage = await createStorage(config, logger);
+  const db = storage.db;
+  const repos = storage.repositories;
+  const sessionStore = storage.sessions as unknown as PgSessionStore<BotSession>;
 
   const profiles = new ProfileService(repos);
   const events = new EventService(repos, config);
@@ -139,6 +129,11 @@ export const createApp = async (
       port: config.miniappPort,
       botToken: config.botToken,
       devMode: config.miniappDev,
+      health: () => ({
+        ok: true,
+        storage: storage.stats(),
+        db: storage.monitor.current(),
+      }),
       getQuestionnaire: async (code, userId) => {
         const event = await events.findByCode(code);
         if (!event) return null;
@@ -339,6 +334,7 @@ export const createApp = async (
       logger.info(`Long polling запущен, напоминания проверяются каждые ${config.reminderTickSeconds} с`);
     }
 
+    storage.start();
     tickTimer = setInterval(() => void tick(), config.reminderTickSeconds * 1000);
     await tick();
   };
@@ -360,7 +356,7 @@ export const createApp = async (
     if (ownWebhookServer) {
       await new Promise<void>((resolve) => ownWebhookServer!.close(() => resolve()));
     }
-    await db.close();
+    await storage.stop();
     logger.info('Остановлено, соединение с БД закрыто');
   };
 

@@ -3,6 +3,7 @@ import { normalizeFields } from '../../domain/questionnaire.js';
 import type { AnswerMode, DosugEvent, EventField, EventStatus } from '../../domain/types.js';
 import { toIso, toIsoOrNull, toNumberOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
+import type { CreateEventRecord, EventPatch, EventsRepository } from './contracts.js';
 
 interface EventRow {
   id: string;
@@ -46,33 +47,7 @@ const mapEvent = (row: EventRow): DosugEvent => ({
   closedAt: toIsoOrNull(row.closed_at),
 });
 
-export interface CreateEventRecord {
-  title: string;
-  description: string;
-  startsAt: string;
-  place: string;
-  placeCoords: { lat: number; lon: number } | null;
-  limit: number | null;
-  fields: EventField[];
-  answerMode?: AnswerMode;
-  organizerId: number;
-  organizerName: string;
-}
-
-export interface EventPatch {
-  title?: string;
-  description?: string;
-  startsAt?: string;
-  place?: string;
-  placeCoords?: { lat: number; lon: number } | null;
-  limit?: number | null;
-  fields?: EventField[];
-  answerMode?: AnswerMode;
-  status?: EventStatus;
-  closedAt?: string | null;
-}
-
-export class EventsRepo {
+export class EventsRepo implements EventsRepository {
   constructor(private readonly db: Db) {}
 
   /** Создаёт событие, подбирая свободный короткий код. */
