@@ -89,6 +89,11 @@ export const cbRegToggle = (fieldIndex: number, optionIndex: number): string =>
   `reg:toggle:${fieldIndex}:${optionIndex}`;
 
 export const cbRegStart = (code: string): string => `reg:start:${code}`;
+/**
+ * Кнопка «Всё верно, отправить» на экране проверки заявки. Код события в payload
+ * нужен, чтобы кнопка отвечала осмысленно, даже если черновик уже потерян.
+ */
+export const cbRegConfirm = (code: string): string => `reg:confirm:${code}`;
 /** Кнопка «Записаться» в приглашении: начинает мастер регистрации. */
 export const cbRegBegin = (code: string): string => `reg:begin:${code}`;
 export const cbRegChange = (code: string): string => `reg:change:${code}`;

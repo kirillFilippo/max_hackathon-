@@ -11,21 +11,27 @@ import {
   handleProfilePaymentDraft,
 } from '../drafts/payment.js';
 import { handleRegisterDraft } from '../drafts/register.js';
+import { registerDraftOwnsCallback } from '../drafts/register.js';
 import {
   handleEditTemplateDraft,
   handleNewTemplateDraft,
   handleRenameTemplateDraft,
 } from '../drafts/templates.js';
 import { showMainMenu } from '../features/events.js';
+import type { DraftState } from '../../session.js';
 import { userIdOf } from '../helpers.js';
 
 /** Кнопки, которые обрабатывает сам мастер, а не общий роутер. */
-const ownsAction = (kind: string, action: string): boolean => {
+const ownsAction = (draft: DraftState, action: string, args: string[]): boolean => {
   if (action === 'draft') return true;
-  if (kind === 'register' && action === 'reg') return true;
+  // Мастер регистрации берёт только кнопки своего шага: остальные `reg:*`
+  // (например, «Иду» из напоминания) обрабатывает общий роутер.
+  if (draft.kind === 'register' && action === 'reg') {
+    return registerDraftOwnsCallback(draft.step, draft.data.eventCode, args);
+  }
   // Вопросы и вход в конструктор мини-приложения — часть мастера события.
   if (
-    (kind === 'create-event' || kind === 'edit-template' || kind === 'new-template')
+    (draft.kind === 'create-event' || draft.kind === 'edit-template' || draft.kind === 'new-template')
     && (action === 'q' || action === 'app')
   ) {
     return true;
@@ -59,7 +65,7 @@ export const handleDraft = async (ctx: BotContext, deps: AppDeps): Promise<boole
   if (isCallback) {
     const { action, args } = parseCallback(ctx.callback?.payload ?? '');
     if (action === 'draft' && args[0] === 'cancel') return cancelToMenu();
-    if (!ownsAction(draft.kind, action)) {
+    if (!ownsAction(draft, action, args)) {
       // Пользователь ушёл в другой раздел: «В меню» явно закрывает черновик,
       // остальные кнопки обрабатывает общий роутер, черновик не трогаем.
       if (action === 'menu' && args[0] === 'main' && ctx.session) ctx.session.draft = null;

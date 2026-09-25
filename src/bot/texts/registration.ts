@@ -1,7 +1,7 @@
 import { formatDateTime } from '../../domain/datetime.js';
 import type { DosugEvent, EventField, EventStats, ItemWithReservation } from '../../domain/types.js';
 import { STATUS_LABELS } from '../../domain/types.js';
-import { CB, cbRegAnswer, cbRegStart, cbRegStatus, cbRegToggle } from '../callbacks.js';
+import { CB, cbRegAnswer, cbRegConfirm, cbRegStart, cbRegStatus, cbRegToggle } from '../callbacks.js';
 import { escapeMarkdown, link, mapLink, withMarkdownKeyboard } from '../message.js';
 import { describeConstraints } from '../../domain/validation.js';
 import { button, cb, chunk, text, valueOrDash, withKeyboard, type KeyboardRows, type MessageContent } from '../message.js';
@@ -195,7 +195,7 @@ export const registerSummary = (
   lines.push('', `Адрес: ${mapLink(event.place, event.placeCoords)}`);
 
   return withMarkdownKeyboard(lines.join('\n'), [
-    [cb('Всё верно, отправить', CB.regConfirm)],
+    [cb('Всё верно, отправить', cbRegConfirm(event.code))],
     [cb('Заполнить заново', cbRegStart(event.code)), cb('Отмена', CB.regCancel)],
   ]);
 };

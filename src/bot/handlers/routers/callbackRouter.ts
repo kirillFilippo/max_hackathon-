@@ -44,7 +44,12 @@ import { startCreateEvent } from '../drafts/createEvent.js';
 import { startAddItems, startItemPrice, startReserveNumbers } from '../drafts/items.js';
 import { startEditField } from '../drafts/editEvent.js';
 import { startTemplateCreate, startTemplateEdit, startTemplateRename } from '../drafts/templates.js';
-import { beginRegistration, quickStatusChange, startEditRegistration } from '../drafts/register.js';
+import {
+  beginRegistration,
+  confirmRegistrationButton,
+  quickStatusChange,
+  startEditRegistration,
+} from '../drafts/register.js';
 import { editMenu } from '../../texts/event.js';
 import { menuRow } from '../helpers.js';
 
@@ -259,6 +264,16 @@ export const handleCallback = async (ctx: BotContext, deps: AppDeps): Promise<vo
       }
       if (sub === 'status') {
         await quickStatusChange(ctx, deps, code, status as ParticipantStatus);
+        return;
+      }
+      // Кнопки без активного черновика (сессия истекла, сообщение осталось):
+      // отвечаем по делу, а не молчим.
+      if (sub === 'confirm') {
+        await confirmRegistrationButton(ctx, deps, code);
+        return;
+      }
+      if (sub === 'cancel') {
+        await show(ctx, withKeyboard('Заявка отменена. Вернуться можно по ссылке или командой /join.', menuRow));
       }
       return;
     }

@@ -5,7 +5,7 @@ import { validateAnswer } from '../../../domain/validation.js';
 import { replyTo, show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, text, withKeyboard } from '../../message.js';
-import type { DraftState } from '../../session.js';
+import type { DraftState, RegisterStep } from '../../session.js';
 import { invitationCard, participantEventCard } from '../../texts/event.js';
 import { resolveAnswerMode } from '../../../domain/questionnaire.js';
 import { buildAnswersUrl } from '../../callbacks.js';
@@ -254,6 +254,53 @@ export const beginRegistration = async (
   await show(ctx, namePrompt(event, profile?.name || user.name));
 };
 
+/**
+ * «Всё верно, отправить» без активного черновика: сессия могла истечь, а сообщение
+ * с кнопкой — остаться в чате. Раньше кнопка молчала; теперь показываем состояние
+ * заявки или запускаем мастер заново.
+ */
+export const confirmRegistrationButton = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  code: string,
+): Promise<void> => {
+  if (!code) {
+    await show(
+      ctx,
+      withKeyboard(
+        'Кнопка устарела: черновик заявки не сохранился. Откройте ссылку-приглашение или отправьте /join.',
+        menuRow,
+      ),
+    );
+    return;
+  }
+
+  const event = await deps.events.findByCode(code);
+  if (!event) {
+    await show(ctx, withKeyboard(`Событие с кодом ${code} не найдено.`, menuRow));
+    return;
+  }
+
+  const user = requireUser(ctx);
+  const existing = await deps.participants.find(event.id, user.user_id);
+  if (existing) {
+    await show(
+      ctx,
+      withKeyboard(
+        `Заявка на «${event.title}» уже принята. Статус: ${STATUS_LABELS[existing.status]}.`,
+        [[cb('К событию', cbEventCard(event.code))], ...menuRow],
+      ),
+    );
+    return;
+  }
+
+  await show(
+    ctx,
+    withKeyboard('Черновик заявки потерян — заполним заново, это быстро.', menuRow),
+  );
+  await beginRegistration(ctx, deps, code);
+};
+
 /** Повторное открытие заявки с подстановкой прошлых ответов. */
 export const startEditRegistration = async (
   ctx: BotContext,
@@ -385,6 +432,40 @@ export const quickStatusChange = async (
     await renderConfirm(ctx, deps, event, ctx.session.draft.data);
   } else {
     await show(ctx, contactPrompt(event));
+  }
+};
+
+/**
+ * Какие `reg:*`-кнопки принадлежат мастеру регистрации на текущем шаге.
+ *
+ * Мастер не должен забирать чужие кнопки: «Иду» из напоминания, статус из карточки
+ * участника или «Изменить ответы» — это не шаги мастера. Раньше любой `reg:*`
+ * перехватывался черновиком, и нажатие «Иду» в напоминании просто перерисовывало
+ * шаг мастера: подтвердить участие было невозможно, пока черновик не закрыт.
+ */
+export const registerDraftOwnsCallback = (
+  step: RegisterStep,
+  eventCode: string,
+  args: string[],
+): boolean => {
+  const sub = args[0] ?? '';
+  // Отмена и «Заполнить заново» относятся к мастеру на любом шаге.
+  if (sub === 'cancel' || sub === 'start') return true;
+
+  switch (step) {
+    case 'name':
+      return sub === 'name';
+    case 'contact':
+      return sub === 'contact';
+    case 'status':
+      // Статус принимаем только для своего события: чужое напоминание обработает роутер.
+      return sub === 'status' && (args[1] ?? '') === eventCode;
+    case 'fields':
+      return sub === 'answer' || sub === 'toggle';
+    case 'confirm':
+      return sub === 'confirm';
+    default:
+      return false;
   }
 };
 
