@@ -97,6 +97,35 @@ describe('Ограничения ответов', () => {
     assert.deepEqual(parseChoiceSelection(multi, '2'), ['Напитки']);
   });
 
+  it('выбор: вариант из нескольких слов не теряется', () => {
+    // Мини-приложение присылает названия вариантов через запятую — пробел внутри
+    // варианта не должен считаться разделителем, иначе ответы молча пропадают.
+    const multi = field('choice', {
+      options: ['Настольные игры', 'D&D', 'Лёгкие настолки', 'Ничего'],
+      multiple: true,
+      minSelected: 1,
+      maxSelected: 3,
+    });
+    assert.deepEqual(validateAnswer(multi, 'Настольные игры, D&D'), {
+      ok: true,
+      value: 'Настольные игры, D&D',
+    });
+    assert.deepEqual(validateAnswer(multi, 'Настольные игры'), {
+      ok: true,
+      value: 'Настольные игры',
+    });
+    assert.deepEqual(validateAnswer(multi, 'Настольные игры; Лёгкие настолки'), {
+      ok: true,
+      value: 'Настольные игры, Лёгкие настолки',
+    });
+    // Номера вариантов и свободный ввод по-прежнему работают.
+    assert.deepEqual(parseChoiceSelection(multi, '1 4'), ['Настольные игры', 'Ничего']);
+    assert.deepEqual(parseChoiceSelection(multi, '1, Ничего'), ['Настольные игры', 'Ничего']);
+    assert.deepEqual(parseChoiceSelection(multi, 'D&D D&D'), ['D&D']);
+    // Ответ в списке вариантов сохраняет порядок анкеты, а не порядок нажатий.
+    assert.deepEqual(parseChoiceSelection(multi, 'Ничего, Настольные игры'), ['Настольные игры', 'Ничего']);
+  });
+
   it('да/нет принимает разные формы', () => {
     const yesno = field('yesno');
     assert.deepEqual(validateAnswer(yesno, 'да'), { ok: true, value: 'Да' });

@@ -54,29 +54,50 @@ const parseDate = (input: string): string | null => {
   return `${pad(day)}.${pad(month)}.${year}`;
 };
 
-/** Разбирает выбор для поля с несколькими вариантами: «1 3», «1,3» или текст вариантов. */
+/**
+ * Разбирает выбор для поля с несколькими вариантами: «1 3», «1,3», «Снеки, Напитки»
+ * или один вариант целиком. Мини-приложение присылает текст вариантов через запятую,
+ * поэтому вариант из нескольких слов («Настольные игры») обязан переживать разбор:
+ * режем по разделителям, а по пробелам — только если иначе не получилось.
+ */
 export const parseChoiceSelection = (field: EventField, input: string): string[] => {
   const raw = input.trim();
   if (raw === '') return [];
-  const tokens = raw.split(/[,;]|\s+/).map((token) => token.trim()).filter(Boolean);
 
-  // Если все токены — числа, считаем их номерами вариантов.
-  if (tokens.length > 0 && tokens.every((token) => /^\d{1,2}$/.test(token))) {
-    const picked = tokens
-      .map((token) => field.options[Number(token) - 1])
-      .filter((option): option is string => option !== undefined);
-    return [...new Set(picked)];
+  const options = field.options;
+  const lowered = options.map((option) => option.toLowerCase());
+  const matchOption = (token: string): string | undefined => {
+    const index = lowered.indexOf(token.trim().toLowerCase());
+    return index >= 0 ? options[index] : undefined;
+  };
+  // Ответ храним в порядке анкеты: так он читается одинаково в чате, панели и выгрузке.
+  const canonical = (picked: string[]): string[] => {
+    const set = new Set(picked);
+    return options.filter((option) => set.has(option));
+  };
+
+  // Один вариант целиком: так приходит ответ, выбранный кнопкой в мини-приложении.
+  const whole = matchOption(raw);
+  if (whole !== undefined) return [whole];
+
+  // Варианты через запятую или точку с запятой: здесь пробелы — часть названия.
+  const bySeparator = raw.split(/[,;]/).map((token) => token.trim()).filter(Boolean);
+  if (bySeparator.length > 1) {
+    const picked = bySeparator.map(matchOption);
+    if (picked.every((option): option is string => option !== undefined)) {
+      return canonical(picked);
+    }
   }
 
-  // Иначе сверяем токены с вариантами по точному совпадению (без регистра).
-  const lowered = field.options.map((option) => option.toLowerCase());
+  // Смешанный ввод: номер варианта («1 3») или название, разделённое пробелами.
+  const tokens = raw.split(/[,;]|\s+/).map((token) => token.trim()).filter(Boolean);
   const picked = tokens
     .map((token) => {
-      const index = lowered.indexOf(token.toLowerCase());
-      return index >= 0 ? field.options[index] : undefined;
+      if (!/^\d{1,2}$/.test(token)) return matchOption(token);
+      return options[Number(token) - 1] ?? matchOption(token);
     })
     .filter((option): option is string => option !== undefined);
-  return [...new Set(picked)];
+  return canonical(picked);
 };
 
 export const describeConstraints = (field: EventField): string => {

@@ -56,7 +56,9 @@ export const renderAnswerPageHtml = (options: { title: string }): string => `<!D
   .status { position:fixed; left:12px; right:12px; bottom:82px; background:#14181f; color:#fff;
       border-radius:8px; padding:10px 12px; font-size:13px; opacity:0; transition:opacity .2s; }
   .status.show { opacity:.95; }
+  .empty { color:var(--muted); text-align:center; padding:14px 0; font-size:14px; }
   .done { padding:40px 16px; text-align:center; font-size:16px; }
+  .done button { margin-top:14px; }
 </style>
 </head>
 <body>
@@ -64,7 +66,7 @@ export const renderAnswerPageHtml = (options: { title: string }): string => `<!D
 <div class="hint">Заполните вопросы и нажмите «Отправить». Данные увидит организатор.</div>
 <div class="event" id="event"></div>
 <div id="statuses" class="statuses"></div>
-<div id="fields"></div>
+<div id="fields"><div class="empty">Загрузка…</div></div>
 <div class="actions"><button class="primary" id="submit">Отправить</button></div>
 <div class="status" id="notice"></div>
 
@@ -85,6 +87,24 @@ const notify = (text) => {
   statusEl.textContent = text;
   statusEl.classList.add('show');
   setTimeout(() => statusEl.classList.remove('show'), 2600);
+};
+
+// Финальный экран: если открыто внутри MAX — можно сразу вернуться в чат.
+const finish = (text) => {
+  document.body.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'done';
+  box.textContent = text;
+  document.body.appendChild(box);
+  try {
+    if (window.WebApp && window.WebApp.close) {
+      const back = document.createElement('button');
+      back.className = 'primary';
+      back.textContent = 'Вернуться в чат';
+      back.onclick = () => window.WebApp.close();
+      box.appendChild(back);
+    }
+  } catch (error) { /* вне MAX кнопка не нужна */ }
 };
 
 const initData = () => {
@@ -157,6 +177,13 @@ const describe = (field) => {
 
 const setAnswer = (field, value) => { me.answers[field.id] = value; };
 
+// Текущий выбор берём из ответов в момент нажатия, а не из разметки: иначе второй
+// отмеченный вариант затирал бы первый (обработчики не перерисовываются).
+const currentSelection = (field) => {
+  const saved = me.answers[field.id];
+  return saved ? String(saved).split(',').map((value) => value.trim()).filter(Boolean) : [];
+};
+
 const renderField = (field, index) => {
   const card = document.createElement('div');
   card.className = 'card';
@@ -173,7 +200,7 @@ const renderField = (field, index) => {
   const current = me.answers[field.id] || '';
 
   if (field.type === 'choice') {
-    const selected = current ? current.split(',').map((v) => v.trim()) : [];
+    const selected = currentSelection(field);
     field.options.forEach((option) => {
       const wrap = document.createElement('label');
       wrap.className = 'choice';
@@ -183,9 +210,10 @@ const renderField = (field, index) => {
       input.checked = selected.includes(option);
       input.onchange = () => {
         if (!field.multiple) { setAnswer(field, option); return; }
-        const set = new Set(selected);
+        const set = new Set(currentSelection(field));
         if (input.checked) set.add(option); else set.delete(option);
-        setAnswer(field, Array.from(set).join(', '));
+        // Порядок — как в списке вариантов, чтобы ответ читался одинаково везде.
+        setAnswer(field, field.options.filter((value) => set.has(value)).join(', '));
       };
       const caption = document.createElement('span');
       caption.textContent = option;
@@ -242,23 +270,37 @@ const render = () => {
 };
 
 const load = async () => {
-  if (!code) { notify('Не понял, к какому событию анкета. Откройте приложение из бота.'); return; }
+  if (!code) {
+    fieldsEl.innerHTML = '<div class="empty">Не понял, к какому событию анкета. Откройте приложение из бота.</div>';
+    return;
+  }
   try {
     const response = await fetch('/app/api/questionnaire?code=' + encodeURIComponent(code) +
       '&initData=' + encodeURIComponent(initData()) +
       (devUserId ? '&devUserId=' + encodeURIComponent(devUserId) : ''));
     const data = await response.json();
-    if (!response.ok) { notify(data.error || 'Не удалось загрузить анкету'); return; }
+    if (!response.ok) {
+      // 403 — почти всегда открытие вне MAX: подписи запуска нет.
+      fieldsEl.innerHTML = '<div class="empty">' + (
+        response.status === 403
+          ? 'Откройте анкету по ссылке из чата с ботом в MAX.'
+          : (data.error || 'Не удалось загрузить анкету')
+      ) + '</div>';
+      return;
+    }
     event = data.event;
     fields = data.fields || [];
     me = Object.assign(me, data.me || {});
     render();
   } catch (error) {
-    notify('Нет связи с ботом');
+    fieldsEl.innerHTML = '<div class="empty">Нет связи с ботом. Попробуйте открыть анкету ещё раз.</div>';
   }
 };
 
-document.getElementById('submit').onclick = async () => {
+const submitButton = document.getElementById('submit');
+
+submitButton.onclick = async () => {
+  if (submitButton.disabled) return;
   const payload = {
     code,
     initData: initData(),
@@ -268,6 +310,8 @@ document.getElementById('submit').onclick = async () => {
     status: me.status,
     answers: me.answers,
   };
+  submitButton.disabled = true;
+  submitButton.textContent = 'Отправляем…';
   try {
     const response = await fetch('/app/answers', {
       method: 'POST',
@@ -275,10 +319,16 @@ document.getElementById('submit').onclick = async () => {
       body: JSON.stringify(payload),
     });
     const data = await response.json();
-    if (!response.ok) { notify(data.error || 'Не удалось отправить ответы'); return; }
-    document.body.innerHTML = '<div class="done">Ответы отправлены. Вернитесь в чат с ботом.</div>';
+    if (!response.ok) {
+      notify(data.error || 'Не удалось отправить ответы');
+      return;
+    }
+    finish('Ответы отправлены. Вернитесь в чат с ботом.');
   } catch (error) {
     notify('Нет связи с ботом');
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Отправить';
   }
 };
 

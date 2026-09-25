@@ -100,6 +100,10 @@ describe('Мини-приложение конструктора вопросо�
     assert.match(html, /id="name"/);
     // Черновик страница забирает по подписи, а не из base64 в URL.
     assert.match(html, /app\/draft\?t=/);
+    assert.match(html, /Загрузка…/);
+    assert.match(html, /Сохраняем…/);
+    assert.match(html, /saveButton\.disabled = true/);
+    assert.match(html, /Вернуться в чат/);
     // Настройка способа ответа спрятана в свёрнутый блок, но доступна организатору.
     assert.match(html, /<details class="mode">/);
     assert.match(html, /Способ ответа участников/);
@@ -258,6 +262,17 @@ describe('Анкета участника в мини-приложении', () 
     assert.match(html, /tpl_/);
     assert.match(html, /\/app\/questions\?t=/);
     assert.match(html, /WebApp\.ready\(\)/);
+    // Выбор нескольких вариантов не должен терять уже отмеченное: состояние берём
+    // из ответов в момент нажатия, а не из разметки.
+    assert.match(html, /currentSelection\(field\)/);
+    assert.doesNotMatch(html, /new Set\(selected\)/);
+    // Понятные состояния: загрузка, ошибка без подписи запуска, возврат в чат.
+    assert.match(html, /Загрузка…/);
+    assert.match(html, /Откройте анкету по ссылке из чата с ботом в MAX\./);
+    assert.match(html, /Вернуться в чат/);
+    assert.match(html, /WebApp\.close\(\)/);
+    // Двойное нажатие «Отправить» не отправит ответы дважды.
+    assert.match(html, /submitButton\.disabled = true/);
   });
 
   it('отдаёт анкету по коду события', async () => {

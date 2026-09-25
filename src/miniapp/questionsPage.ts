@@ -56,6 +56,7 @@ export const renderMiniappHtml = (options: { title: string }): string => `<!DOCT
       background:linear-gradient(180deg, rgba(244,246,250,0) 0%, var(--bg) 40%); }
   .actions button { flex:1; }
   .empty { color:var(--muted); text-align:center; padding:14px 0; font-size:14px; }
+  .done button { margin-top:14px; }
   .weight { font-size:12px; color:var(--muted); margin:0 0 10px; }
   .weight b { color:var(--ink); }
   details.mode { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
@@ -80,7 +81,7 @@ export const renderMiniappHtml = (options: { title: string }): string => `<!DOCT
 </div>
 
 <div class="weight" id="weight"></div>
-<div id="list"></div>
+<div id="list"><div class="empty">Загрузка…</div></div>
 <button id="add" style="width:100%">Добавить вопрос</button>
 
 <details class="mode">
@@ -326,8 +327,22 @@ document.getElementById('add').onclick = () => {
   render();
 };
 
+// Финальный экран: внутри MAX можно сразу закрыть приложение и вернуться в чат.
 const finish = (text) => {
-  document.body.innerHTML = '<div class="done">' + text + '</div>';
+  document.body.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'done';
+  box.textContent = text;
+  document.body.appendChild(box);
+  try {
+    if (window.WebApp && window.WebApp.close) {
+      const back = document.createElement('button');
+      back.className = 'primary';
+      back.textContent = 'Вернуться в чат';
+      back.onclick = () => window.WebApp.close();
+      box.appendChild(back);
+    }
+  } catch (error) { /* вне MAX кнопка не нужна */ }
 };
 
 const cleanFields = () => fields
@@ -360,13 +375,18 @@ const validate = (clean) => {
   return null;
 };
 
-document.getElementById('save').onclick = async () => {
+const saveButton = document.getElementById('save');
+
+saveButton.onclick = async () => {
+  if (saveButton.disabled) return;
   if (!ticket) { notify('Откройте конструктор заново из чата с ботом'); return; }
   const clean = cleanFields();
   if (clean.length === 0) { notify('Добавьте хотя бы один вопрос'); return; }
   const problem = validate(clean);
   if (problem) { notify(problem); return; }
 
+  saveButton.disabled = true;
+  saveButton.textContent = 'Сохраняем…';
   try {
     const response = await fetch('/app/fields', {
       method: 'POST',
@@ -378,6 +398,9 @@ document.getElementById('save').onclick = async () => {
     finish('Сохранено. Вернитесь в чат с ботом.');
   } catch (error) {
     notify('Нет связи с ботом');
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = 'Сохранить в бота';
   }
 };
 
@@ -386,17 +409,23 @@ document.getElementById('cancel').onclick = () => finish('Изменения н�
 // Черновик забираем с сервера по подписи: URL остаётся коротким, а повторное
 // открытие конструктора не теряет уже собранные вопросы.
 const load = async () => {
-  if (!ticket) { notify('Откройте конструктор заново из чата с ботом'); return; }
+  if (!ticket) {
+    listEl.innerHTML = '<div class="empty">Откройте конструктор заново из чата с ботом.</div>';
+    return;
+  }
   try {
     const response = await fetch('/app/draft?t=' + encodeURIComponent(ticket));
     const data = await response.json();
-    if (!response.ok) { notify(data.error || 'Ссылка конструктора устарела'); return; }
+    if (!response.ok) {
+      listEl.innerHTML = '<div class="empty">' + (data.error || 'Ссылка конструктора устарела') + '</div>';
+      return;
+    }
     fields = (data.fields || []).map(normalize);
     answerMode = ['auto', 'chat', 'miniapp'].includes(data.answerMode) ? data.answerMode : 'auto';
     nameEl.value = data.name || '';
     render();
   } catch (error) {
-    notify('Нет связи с ботом');
+    listEl.innerHTML = '<div class="empty">Нет связи с ботом. Откройте конструктор ещё раз.</div>';
   }
 };
 
