@@ -36,6 +36,9 @@ export const runReminderTick = async (
   for (const task of tick.tasks) {
     const content = await renderReminder(deps, task);
     try {
+      // Порядок осознанный: сначала доставка, потом отметка. Если упадёт отметка,
+      // напоминание придёт дважды — это неприятно, но не страшно; обратный порядок
+      // терял бы напоминание при сбое доставки, а неявка хуже дубля.
       await deps.notifier.sendToUser(task.participant.userId, content);
       await deps.reminders.markSent(task, now);
       if (task.kind === 'confirm') result.confirmSent += 1;
