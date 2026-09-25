@@ -5,8 +5,6 @@
 
 export type ParticipantStatus = 'going' | 'maybe' | 'not_going' | 'pending';
 
-export const PARTICIPANT_STATUSES: ParticipantStatus[] = ['going', 'maybe', 'not_going'];
-
 export const STATUS_LABELS: Record<ParticipantStatus, string> = {
   going: 'Иду',
   maybe: 'Под вопросом',

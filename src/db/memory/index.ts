@@ -274,7 +274,8 @@ export class MemoryParticipantsRepository implements ParticipantsRepository {
           username: input.username,
           contact: input.contact,
           status: input.status,
-          answers: { ...current.answers, ...input.answers },
+          // Как и в базе: ответы заменяются целиком (слияние не даёт очистить ответ).
+          answers: { ...input.answers },
           waitlisted: input.waitlisted,
           updatedAt: now,
         }

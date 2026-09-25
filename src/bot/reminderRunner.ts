@@ -18,6 +18,15 @@ export const runReminderTick = async (
   now: Date = new Date(),
 ): Promise<ReminderRunResult> => {
   const result: ReminderRunResult = { confirmSent: 0, finalSent: 0, closed: 0, errors: 0 };
+
+  // Заодно чистим просроченные черновики: иначе таблица сессий растёт вечно.
+  try {
+    const removed = await deps.sessions.cleanupExpired();
+    if (removed > 0) deps.logger.debug(`Удалено просроченных черновиков: ${removed}`);
+  } catch (error) {
+    deps.logger.warn('Не удалось почистить просроченные черновики', error);
+  }
+
   const tick = await deps.reminders.due(now);
   result.closed = tick.closedEvents.length;
   tick.closedEvents.forEach((event) =>

@@ -98,6 +98,9 @@ export const requestTransfers = async (
     withKeyboard(
       [
         `Запросы на перевод отправлены: ${sent}.`,
+        result.alreadyNotified > 0
+          ? `Уже получали карточку: ${result.alreadyNotified} — повторно не пишу, чтобы не дублировать.`
+          : '',
         '',
         result.toNotify.length === 0
           ? 'Новых расчётов нет: переводы не требуются или все уже закрыты.'

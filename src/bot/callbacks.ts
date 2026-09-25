@@ -79,7 +79,6 @@ export const cbDraftEditorSkip = (): string => 'draft:editorskip';
 export const cbDraftEditorCancel = (): string => 'draft:editorcancel';
 export const cbDraftFieldMultiple = (multiple: boolean): string =>
   `draft:fieldmulti:${multiple ? 'yes' : 'no'}`;
-export const cbDraftFieldPreset = (label: string): string => `draft:fieldpreset:${label}`;
 export const cbQuestionsApp = (scope: 'draft' | string): string => `app:questions:${scope}`;
 export const cbQuestionsModeShow = (scope: string): string => `q:mode:${scope}`;
 export const cbQuestionsModeSet = (scope: string, mode: string): string => `q:set:${scope}:${mode}`;
@@ -119,28 +118,12 @@ export const parseCallback = (payload: string): ParsedCallback => {
   return { action, args };
 };
 
-/** Публичная ссылка на бота с payload диплинка. */
-export const buildInviteUrl = (botUsername: string, eventCode: string): string =>
-  `https://max.ru/${botUsername}?start=ev_${eventCode}`;
-
-/** Диплинк мини-приложения с анкетой: MAX отдаёт это в start_param. */
-export const buildAnswersUrl = (botUsername: string, eventCode: string): string =>
-  `https://max.ru/${botUsername}?startapp=ev_${eventCode}`;
-
-/**
- * Диплинк мини-приложения с конструктором вопросов. Открываем конструктор тем же
- * способом, что и анкету участника: MAX сам открывает зарегистрированное
- * мини-приложение, а подпись мастера едет в `start_param`.
- */
-export const buildConstructorUrl = (botUsername: string, ticket: string): string =>
-  `https://max.ru/${botUsername}?startapp=${CONSTRUCTOR_START_PREFIX}${ticket}`;
-
-export const EVENT_START_PREFIX = 'ev_';
-export const CONSTRUCTOR_START_PREFIX = 'tpl_';
-
-/** Достаёт код события из payload диплинка `/start`. */
-export const eventCodeFromStartPayload = (payload: string | null | undefined): string | null => {
-  if (!payload || !payload.startsWith(EVENT_START_PREFIX)) return null;
-  const code = payload.slice(EVENT_START_PREFIX.length).trim().toUpperCase();
-  return code.length > 0 ? code : null;
-};
+// Ссылки и разбор payload живут в домене: их используют и сервисы, и тексты.
+export {
+  buildAnswersUrl,
+  buildConstructorUrl,
+  buildInviteUrl,
+  CONSTRUCTOR_START_PREFIX,
+  EVENT_START_PREFIX,
+  eventCodeFromStartPayload,
+} from '../domain/links.js';

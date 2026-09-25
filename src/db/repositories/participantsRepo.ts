@@ -49,7 +49,9 @@ export class ParticipantsRepo implements ParticipantsRepository {
          username   = EXCLUDED.username,
          contact    = EXCLUDED.contact,
          status     = EXCLUDED.status,
-         answers    = participants.answers || EXCLUDED.answers,
+         -- Ответы заменяем целиком: слияние не давало снять ранее данный ответ.
+         -- Кто хочет дополнить, тот передаёт полный набор (setAnswer мержит сам).
+         answers    = EXCLUDED.answers,
          waitlisted = EXCLUDED.waitlisted,
          updated_at = now()
        RETURNING *`,

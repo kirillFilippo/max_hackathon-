@@ -7,6 +7,7 @@ import { cbQuestionsApp } from '../../callbacks.js';
 import { templateCard, templateFieldsEditor } from '../../texts/event.js';
 import { handleFieldsScreenInput } from './fieldsScreen.js';
 import { menuRow, userIdOf } from '../helpers.js';
+import { callbackArgs } from './fieldsScreen.js';
 
 export type RenameTemplateDraft = Extract<DraftState, { kind: 'rename-template' }>;
 export type EditTemplateDraft = Extract<DraftState, { kind: 'edit-template' }>;
@@ -35,9 +36,7 @@ export const handleNewTemplateDraft = async (
   draft: NewTemplateDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-  const { action, args } = isCallback
-    ? parseCallback(ctx.callback?.payload ?? '')
-    : { action: '', args: [] as string[] };
+    const { action, args } = callbackArgs(ctx);
 
   if (draft.step === 'name') {
     const input = userText(ctx);
@@ -146,9 +145,7 @@ export const handleEditTemplateDraft = async (
   draft: EditTemplateDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-  const { action, args } = isCallback
-    ? parseCallback(ctx.callback?.payload ?? '')
-    : { action: '', args: [] as string[] };
+    const { action, args } = callbackArgs(ctx);
 
   if (!draft.editor && isCallback && action === 'draft' && args[0] === 'skip') {
     const updated = await deps.templates.updateFields(draft.templateId, userIdOf(ctx), draft.fields);

@@ -122,14 +122,5 @@ export const callbackArgs = (ctx: BotContext): { action: string; args: string[] 
     ? parseCallback(ctx.callback?.payload ?? '')
     : { action: '', args: [] };
 
-/** Экран вопросов для черновика: список и кнопки. */
-export const renderFields = async (
-  ctx: BotContext,
-  _deps: AppDeps,
-  host: FieldsHost & { data?: { answerMode?: string | null; templateId?: string | null } },
-): Promise<void> => {
-  await show(ctx, fieldsEditor(host.fields, (host.data?.answerMode ?? 'auto') as never));
-};
-
 export type { FieldEditorState };
 export { fieldsEditor };

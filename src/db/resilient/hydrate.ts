@@ -33,7 +33,12 @@ export const hydrateMemory = async (
 
   for (const userId of userIds) {
     const profile = await pg.users.find(userId);
-    if (profile) store.putUser(profile);
+    if (profile) {
+      // Дату регистрации берём из базы: в UserProfile её нет, а в зеркале она нужна,
+      // чтобы после обрыва связи отличить новичка от постоянного гостя.
+      const createdAt = await pg.users.createdAt(userId);
+      store.putUser(createdAt ? { ...profile, createdAt } : profile);
+    }
     for (const template of await pg.templates.listByOwner(userId)) store.putTemplate(template);
   }
 

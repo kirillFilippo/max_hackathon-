@@ -125,4 +125,3 @@ export const answerModeScreen = (
   );
 };
 
-export const questionsAppAvailable = (deps: AppDeps): boolean => deps.miniapp !== null;

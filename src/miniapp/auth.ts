@@ -65,6 +65,9 @@ export interface InitDataCheck {
 }
 
 /** @param maxAgeSec допустимый возраст подписи (по документации рекомендуется ~1 час) */
+/** Допустимое расхождение часов при проверке подписи запуска, секунды. */
+const CLOCK_SKEW_SEC = 60;
+
 export const validateInitData = (
   initData: string,
   botToken: string,
@@ -93,8 +96,11 @@ export const validateInitData = (
   }
 
   if (data.authDate && maxAgeSec > 0) {
-    const ageSec = Math.abs(Date.now() - data.authDate.getTime()) / 1000;
-    if (ageSec > maxAgeSec) {
+    // Возраст считаем в одну сторону: подпись «из будущего» — тоже признак
+    // подделки, поэтому Math.abs здесь не годится. Минутная поправка — на
+    // расхождение часов между телефоном и сервером.
+    const ageSec = (Date.now() - data.authDate.getTime()) / 1000;
+    if (ageSec > maxAgeSec || ageSec < -CLOCK_SKEW_SEC) {
       return { ok: false, reason: 'Данные запуска устарели, откройте приложение заново', data };
     }
   }

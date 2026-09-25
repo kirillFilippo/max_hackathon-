@@ -63,9 +63,6 @@ before(async () => {
       if (at === undefined) return null;
       return { userId: 7, at };
     },
-    consumeTicket: (ticket) => {
-      validTickets.delete(ticket);
-    },
     onFieldsSaved: async (userId, fields, answerMode, name) => {
       saved.push({ userId, fields, answerMode, name });
     },

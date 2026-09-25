@@ -19,6 +19,8 @@ export interface RequestTransfersResult {
   toNotify: TransferRequest[];
   /** Уже закрытые пары, которые не трогаем. */
   alreadyClosed: number;
+  /** Сколько должников уже получали карточку — повторно не пишем. */
+  alreadyNotified: number;
   totalKopecks: number;
 }
 
@@ -77,16 +79,23 @@ export class SettlementService {
     );
 
     const saved = await this.repos.transfers.upsertMany(event.id, relevant);
-    const toNotify = saved.filter((request) => request.status !== 'closed');
+    // Пишем только тем, кто ещё не получал карточку: повторное нажатие кнопки
+    // не должно заваливать должников одинаковыми сообщениями.
+    const toNotify = saved.filter(
+      (request) => request.status !== 'closed' && request.notifiedAt === null,
+    );
+    const alreadyNotified = saved.filter(
+      (request) => request.status !== 'closed' && request.notifiedAt !== null,
+    ).length;
 
     await Promise.all(
-      toNotify
-        .filter((request) => request.notifiedAt === null)
-        .map((request) => this.repos.transfers.patch(request.id, { notifiedAt: new Date().toISOString() })),
+      toNotify.map((request) =>
+        this.repos.transfers.patch(request.id, { notifiedAt: new Date().toISOString() })),
     );
 
     return {
       toNotify,
+      alreadyNotified,
       alreadyClosed: existing.filter((request) => request.status === 'closed').length,
       totalKopecks: view.settlement.totalKopecks,
     };

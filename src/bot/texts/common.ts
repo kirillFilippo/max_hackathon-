@@ -43,22 +43,9 @@ export const helpText = (): MessageContent =>
     [[cb('В меню', CB.menuMain)]],
   );
 
-export const cancelled = (): MessageContent =>
-  withKeyboard('Действие отменено.', [[cb('В меню', CB.menuMain)]]);
 
-export const eventNotFound = (code: string): MessageContent =>
-  withKeyboard(
-    `Событие с кодом ${code} не найдено.\n\nПроверьте код или попросите у организатора ссылку-приглашение.`,
-    [[cb('В меню', CB.menuMain)]],
-  );
 
-export const notOrganizer = (): MessageContent =>
-  withKeyboard('Это событие создал другой организатор, управлять им нельзя.', [
-    [cb('В меню', CB.menuMain)],
-  ]);
 
-export const unknownInput = (hint: string): MessageContent =>
-  withKeyboard(hint, [[cb('В меню', CB.menuMain)]]);
 
 export const fallback = (options: { eventsCount: number }): MessageContent => {
   const hint =

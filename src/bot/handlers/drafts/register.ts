@@ -12,6 +12,7 @@ import { buildAnswersUrl } from '../../callbacks.js';
 import { answerFormCard, registrationNotice } from '../../texts/registration.js';
 import { eventViewOptions } from '../features/events.js';
 import { botUsernameOf, menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
+import { callbackArgs } from './fieldsScreen.js';
 import {
   contactPrompt,
   namePrompt,
@@ -105,13 +106,15 @@ const saveRegistration = async (
     await deps.profiles.saveContact(user.user_id, data.contact.trim());
   }
 
+  // Список покупок читаем до сброса черновика: если чтение упадёт, пользователь
+  // не останется «записанным, но без ответов и без возможности их поправить».
+  const items = await deps.items.list(event.id);
+  await show(ctx, participantEventCard(event, result.participant, eventViewOptions(ctx, deps), items.length));
+
   if (ctx.session) {
     ctx.session.draft = null;
     ctx.session.lastEventCode = event.code;
   }
-
-  const items = await deps.items.list(event.id);
-  await show(ctx, participantEventCard(event, result.participant, eventViewOptions(ctx, deps), items.length));
 
   if (result.waitlisted) {
     await replyTo(
@@ -476,9 +479,7 @@ export const handleRegisterDraft = async (
   draft: RegisterDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-  const { action, args } = isCallback
-    ? parseCallback(ctx.callback?.payload ?? '')
-    : { action: '', args: [] as string[] };
+    const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
   const event = await deps.events.findByCode(draft.data.eventCode);

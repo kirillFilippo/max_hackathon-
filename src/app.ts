@@ -200,9 +200,6 @@ export const createApp = async (
         }
         return owner;
       },
-      consumeTicket: (ticket) => {
-        tickets.delete(ticket);
-      },
       getDraft: (userId) => readDraftQuestionnaire(deps, userId),
       onFieldsSaved: (userId, fields, answerMode, name) =>
         applyMiniappFields(deps, userId, fields, answerMode, name),
@@ -211,7 +208,6 @@ export const createApp = async (
       buildUrl: (ticket) => miniapp!.buildUrl(ticket),
       registerTicket: (ticket, owner) => {
         tickets.set(ticket, owner);
-        miniapp!.registerTicket(ticket, owner);
       },
       takeTicket: (ticket) => {
         const owner = tickets.get(ticket);

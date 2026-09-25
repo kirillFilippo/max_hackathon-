@@ -164,14 +164,6 @@ export const registerFieldPrompt = (
   return text(lines.join('\n'));
 };
 
-/** Превью всей анкеты: участник видит список вопросов до начала ответов. */
-export const questionnairePreview = (fields: EventField[]): string => {
-  if (fields.length === 0) return '';
-  const lines = [`Анкета: ${fields.length} ${fields.length === 1 ? 'вопрос' : 'вопроса'}`];
-  fields.forEach((field, index) => lines.push(`${index + 1}. ${field.label} (${describeConstraints(field)})`));
-  return lines.join('\n');
-};
-
 export const registerSummary = (
   event: DosugEvent,
   data: RegisterDraftData,

@@ -19,7 +19,6 @@ import {
 } from '../drafts/templates.js';
 import { showMainMenu } from '../features/events.js';
 import type { DraftState } from '../../session.js';
-import { userIdOf } from '../helpers.js';
 
 /** Кнопки, которые обрабатывает сам мастер, а не общий роутер. */
 const ownsAction = (draft: DraftState, action: string, args: string[]): boolean => {
@@ -103,7 +102,6 @@ export const handleDraft = async (ctx: BotContext, deps: AppDeps): Promise<boole
       await show(ctx, withKeyboard('Черновик устарел, начните заново.', [
         [cb('В меню', 'menu:main')],
       ]));
-      void userIdOf;
       return true;
     }
   }

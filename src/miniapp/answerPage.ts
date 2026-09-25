@@ -6,20 +6,6 @@
  * Страница показывает все вопросы сразу, проверяет ввод по ограничениям и
  * отправляет ответы на сервер бота вместе с подписью запуска (initData).
  */
-export interface AnswerPageField {
-  id: string;
-  label: string;
-  type: string;
-  options: string[];
-  multiple: boolean;
-  minSelected: number | null;
-  maxSelected: number | null;
-  min: number | null;
-  max: number | null;
-  maxLength: number | null;
-  required: boolean;
-}
-
 export const renderAnswerPageHtml = (options: { title: string }): string => `<!DOCTYPE html>
 <html lang="ru">
 <head>

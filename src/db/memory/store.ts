@@ -201,7 +201,7 @@ export class MemoryStore {
   }
 
   /** Кладёт профиль по userId, сохраняя даты создания и обновления. */
-  putUser(profile: UserProfile): void {
+  putUser(profile: UserProfile & Partial<Pick<StoredUserProfile, 'createdAt' | 'updatedAt'>>): void {
     const previous = this.userById.get(profile.userId);
     const raw = profile as Partial<StoredUserProfile>;
     const now = new Date().toISOString();

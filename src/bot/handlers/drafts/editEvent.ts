@@ -15,6 +15,7 @@ import type { DraftState } from '../../session.js';
 import { placeConfirm, placePrompt } from '../../texts/event.js';
 import { cbEventCard } from '../../callbacks.js';
 import { notifyParticipants, userIdOf } from '../helpers.js';
+import { callbackArgs } from './fieldsScreen.js';
 
 export type EditEventDraft = Extract<DraftState, { kind: 'edit-event' }>;
 
@@ -61,9 +62,7 @@ export const handleEditEventDraft = async (
   }
 
   const isCallback = ctx.updateType === 'message_callback';
-  const { action, args } = isCallback
-    ? parseCallback(ctx.callback?.payload ?? '')
-    : { action: '', args: [] as string[] };
+    const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
   const applyEdit = async (patch: Record<string, unknown>): Promise<void> => {

@@ -17,11 +17,6 @@ export const requireUser = (ctx: BotContext): SdkUser => {
 
 export const userIdOf = (ctx: BotContext): number => requireUser(ctx).user_id;
 
-export const userNameOf = (ctx: BotContext): string => {
-  const user = requireUser(ctx);
-  return [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || user.name || `id${user.user_id}`;
-};
-
 export const botUsernameOf = (ctx: BotContext, deps: AppDeps): string | undefined =>
   ctx.botInfo?.username ?? deps.config.botUsername;
 

@@ -1,5 +1,5 @@
 import { answerFaq, FAQ_ITEMS, matchFaq, type FaqContext } from '../../../services/faqService.js';
-import { CB, cbFaqQuestion } from '../../callbacks.js';
+import { CB, cbFaqEvent, cbFaqQuestion } from '../../callbacks.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, chunk, withKeyboard } from '../../message.js';
@@ -38,7 +38,7 @@ export const showFaq = async (ctx: BotContext, deps: AppDeps): Promise<void> => 
     pair.map((item) =>
       cb(
         item.question,
-        event ? cbFaqEventPayload(event.code, item.key) : cbFaqQuestion(item.key),
+        event ? cbFaqEvent(event.code, item.key) : cbFaqQuestion(item.key),
       ),
     ),
   );
@@ -52,8 +52,6 @@ export const showFaq = async (ctx: BotContext, deps: AppDeps): Promise<void> => 
   if (event) lines.push('', `Отвечаю в контексте события «${event.title}» (${event.code}).`);
   await show(ctx, withKeyboard(lines.join('\n'), rows));
 };
-
-const cbFaqEventPayload = (code: string, key: string): string => `faq:ev:${code}:${key}`;
 
 export const answerFaqKey = async (
   ctx: BotContext,

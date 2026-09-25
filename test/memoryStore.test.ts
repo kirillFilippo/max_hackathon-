@@ -293,7 +293,7 @@ describe('память: события', () => {
 });
 
 describe('память: участники', () => {
-  it('upsert сливает ответы с прежними, patch заменяет их целиком', async () => {
+  it('upsert и patch заменяют ответы целиком (как в базе: слияние не даёт снять ответ)', async () => {
     const repos = createMemoryRepositories();
     const event = await repos.events.create(eventInput());
 
@@ -313,6 +313,10 @@ describe('память: участники', () => {
     assert.equal(second.name, 'Борис');
     assert.equal(second.status, 'going');
     assert.deepEqual(second.answers, { size: 'L', color: 'красный' });
+
+    // Главное отличие замены от слияния: пропущенный ключ исчезает.
+    const third = await repos.participants.upsert(participantInput(event.id, { answers: { size: 'S' } }));
+    assert.deepEqual(third.answers, { size: 'S' });
 
     const patched = await repos.participants.patch(event.id, 7, {
       answers: { size: 'S' },

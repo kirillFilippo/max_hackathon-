@@ -82,8 +82,6 @@ export interface MiniappDeps {
   saveAnswers: (submission: AnswerSubmission) => Promise<AnswerSaveResult>;
   /** Проверяет одноразовую подпись мастера (или null, если она истекла/неизвестна). */
   takeTicket: (ticket: string) => MiniappTicket | null;
-  /** Подпись живёт ограниченное время и допускает повторные сохранения. */
-  consumeTicket?: (ticket: string) => void;
   /** Текущий черновик организатора: его конструктор подтягивает по подписи. */
   getDraft: (userId: number) => Promise<MiniappDraft | null>;
   /** Вызывается ботом: сохранить поля в черновик организатора и обновить сообщение. */
@@ -104,7 +102,6 @@ export interface MiniappHandle {
    * на длинных анкетах.
    */
   buildUrl: (ticket: string) => string;
-  registerTicket: (ticket: string, owner: MiniappTicket) => void;
   close: () => Promise<void>;
 }
 
@@ -205,8 +202,6 @@ const sanitizeAnswerMode = (raw: unknown): AnswerMode =>
  * порту (MINIAPP_PORT).
  */
 export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHandle> => {
-  const tickets = new Map<string, MiniappTicket>();
-
   const server: Server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -413,9 +408,6 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
     buildUrl: (ticket: string) => {
       const params = new URLSearchParams({ t: ticket });
       return `${baseUrl}/app/questions?${params.toString()}`;
-    },
-    registerTicket: (ticket: string, owner: MiniappTicket) => {
-      tickets.set(ticket, owner);
     },
     close: () =>
       new Promise<void>((resolve) => {

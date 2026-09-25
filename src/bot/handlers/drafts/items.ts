@@ -1,4 +1,4 @@
-import { parsePriceKopecks } from '../../../domain/money.js';
+import { formatRub, parsePriceKopecks } from '../../../domain/money.js';
 import { CB } from '../../callbacks.js';
 import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
@@ -178,7 +178,7 @@ export const handleItemPriceDraft = async (
   if (updated) {
     const view = await deps.settlements.view(event);
     const hint = view.settlement.totalKopecks > 0
-      ? `Общие траты: ${view.settlement.totalKopecks / 100} ₽ на ${view.settlement.participantsCount} участников.`
+      ? `Общие траты: ${formatRub(view.settlement.totalKopecks)} на ${view.settlement.participantsCount} участников.`
       : '';
     if (hint) {
       await show(
@@ -189,5 +189,3 @@ export const handleItemPriceDraft = async (
   }
   return true;
 };
-
-export { reserveResult };

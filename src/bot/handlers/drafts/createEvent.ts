@@ -19,6 +19,7 @@ import { renderFieldsScreen } from '../questions.js';
 import { handleFieldsScreenInput } from './fieldsScreen.js';
 import { eventViewOptions } from '../features/events.js';
 import { botUsernameOf, menuRow, userIdOf } from '../helpers.js';
+import { callbackArgs } from './fieldsScreen.js';
 
 export type CreateEventDraft = Extract<DraftState, { kind: 'create-event' }>;
 
@@ -156,9 +157,7 @@ export const handleCreateEventDraft = async (
   draft: CreateEventDraft,
 ): Promise<boolean> => {
   const isCallback = ctx.updateType === 'message_callback';
-  const { action, args } = isCallback
-    ? parseCallback(ctx.callback?.payload ?? '')
-    : { action: '', args: [] as string[] };
+    const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
   if (isCallback && action === 'draft' && args[0] === 'back') {

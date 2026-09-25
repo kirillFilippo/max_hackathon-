@@ -1,4 +1,4 @@
-import { buildInviteUrl } from '../bot/callbacks.js';
+import { buildInviteUrl } from '../domain/links.js';
 import type { AppConfig } from '../config.js';
 import { formatDateTime } from '../domain/datetime.js';
 import type { Repositories } from '../db/repositories/index.js';
