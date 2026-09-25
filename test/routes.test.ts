@@ -1,0 +1,184 @@
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+
+import { createBotHarness, type BotHarness } from './botHarness.js';
+import { hoursFromNow } from './support.js';
+
+/**
+ * Маршрутизация кнопок: каждая ветка роутера должна на что-то отвечать и не
+ * падать. Это «дымовой» тест — он ловит опечатки в payload'ах и потерянные
+ * ветки, которые иначе обнаруживаются только руками в живом боте.
+ *
+ * Полные сценарии лежат в других файлах (flows, shopMoney, registration).
+ */
+describe('Маршрутизация кнопок: дымовые проверки', () => {
+  let harness: BotHarness;
+
+  before(async () => {
+    harness = await createBotHarness();
+  });
+
+  after(async () => {
+    await harness.stop();
+  });
+
+  const event = async (organizerId = 1200) =>
+    harness.base.events.create({
+      title: 'Вечер настолок',
+      description: 'Берём свои игры',
+      startsAt: hoursFromNow(48),
+      place: 'антикафе Кубик',
+      placeCoords: null,
+      limit: 6,
+      fields: [],
+      answerMode: 'auto',
+      organizerId,
+      organizerName: 'Оля',
+    });
+
+  /** Клик по кнопке: бот должен ответить и не пожаловаться на ошибку. */
+  const clickOk = async (payload: string, chatId = 1200, userId = 1200): Promise<string> => {
+    harness.clearSent();
+    await harness.click(payload, { chatId, userId });
+    const texts = harness.texts(chatId);
+    assert.ok(texts.length > 0, `нет ответа на ${payload}`);
+    const failed = texts.filter((text) => /Не получилось выполнить|Не удалось выполнить/i.test(text));
+    assert.deepEqual(failed, [], `бот ответил ошибкой на ${payload}: ${failed.join(' | ')}`);
+    return texts.join('\n');
+  };
+
+  it('меню: помощь, частые вопросы, расчёты и профиль', async () => {
+    for (const payload of ['menu:help', 'menu:faq', 'menu:duties', 'menu:profile', 'menu:events']) {
+      const answer = await clickOk(payload);
+      assert.ok(answer.trim().length > 0);
+    }
+  });
+
+  it('карточка события, состав, ссылка и дополнительная информация', async () => {
+    const created = await event();
+    const card = await clickOk(`ev:card:${created.code}`);
+    assert.match(card, /Вечер настолок/);
+
+    const people = await clickOk(`ev:people:${created.code}`);
+    assert.match(people, /Участники|никого/i);
+
+    const link = await clickOk(`ev:link:${created.code}`);
+    assert.match(link, /max\.ru|Код события/);
+
+    const info = await clickOk(`ev:info:${created.code}`);
+    assert.match(info, /Вечер настолок/);
+  });
+
+  it('настройка способа ответа на анкету и возврат', async () => {
+    const created = await event();
+    const screen = await clickOk(`q:mode:${created.code}`);
+    assert.match(screen, /Способ ответа/);
+
+    const applied = await clickOk(`q:set:${created.code}:chat`);
+    assert.match(applied, /Вечер настолок/);
+    const stored = await harness.base.events.findByCode(created.code);
+    assert.equal(stored?.answerMode, 'chat');
+
+    // Кнопка возврата ведёт к карточке события (payload собирает сама карточка).
+    const back = await clickOk(`ev:card:${created.code}`);
+    assert.match(back, /Вечер настолок/);
+  });
+
+  it('редактирование события открывает меню правок', async () => {
+    const created = await event();
+    const menu = await clickOk(`ev:edit:${created.code}`);
+    assert.match(menu, /Что меняем/);
+
+    // Открываем конкретное поле и отменяем: мастер не должен залипнуть,
+    // а следующий текст — обрабатываться как шаг редактирования.
+    await clickOk(`ev:set:${created.code}:title`);
+    harness.clearSent();
+    await harness.sendText('/cancel', { chatId: 1200, userId: 1200 });
+    assert.match(harness.lastText(1200), /Ассистент организатора|Мои события/);
+
+    const sessions = await harness.base.deps.sessions.findByUser(1200);
+    const withDraft = sessions.filter((row) => Boolean((row.value as { draft?: unknown }).draft));
+    assert.deepEqual(withDraft, [], 'после отмены черновик остался');
+
+    // Свободный текст после отмены обрабатывается как обычное сообщение.
+    harness.clearSent();
+    await harness.sendText('привет', { chatId: 1200, userId: 1200 });
+    assert.ok(harness.lastText(1200).trim().length > 0);
+  });
+
+  it('напоминание участникам по кнопке организатора', async () => {
+    const created = await event();
+    await harness.base.participants.save({
+      event: created,
+      userId: 1201,
+      name: 'Аня',
+      username: null,
+      contact: '',
+      status: 'going',
+      answers: {},
+    });
+
+    await clickOk(`ev:remind:${created.code}`);
+    const delivered = harness.sent.filter((message) => message.chatId === 1201);
+    assert.ok(delivered.length > 0, 'участник не получил напоминание');
+  });
+
+  it('закрытие события меняет его состояние', async () => {
+    const created = await event();
+    await clickOk(`ev:close:${created.code}`);
+    const stored = await harness.base.events.findByCode(created.code);
+    assert.equal(stored?.status, 'closed');
+  });
+
+  it('шаблоны: список, карточка и переименование', async () => {
+    const template = await harness.base.templates.createFromFields(1200, 'Мой набор', []);
+
+    const list = await clickOk('menu:templates');
+    assert.match(list, /набор|Набор/i);
+
+    const card = await clickOk(`tpl:edit:${template.id}`);
+    assert.match(card, /Мой набор/);
+
+    harness.clearSent();
+    await harness.click(`tpl:rename:${template.id}`, { chatId: 1200, userId: 1200 });
+    await harness.sendText('Новый набор', { chatId: 1200, userId: 1200 });
+    const renamed = await harness.base.templates.find(template.id, 1200);
+    assert.equal(renamed?.name, 'Новый набор');
+  });
+
+  it('частые вопросы: ответ по кнопке и по свободному тексту', async () => {
+    const created = await event();
+    const answer = await clickOk(`faq:ev:${created.code}:where`, 1200, 1200);
+    assert.match(answer, /адрес|Адрес|карт|место/i);
+
+    // Свободный текст в контексте события тоже находит ответ.
+    harness.clearSent();
+    await harness.sendText(`/start ev_${created.code}`, { chatId: 1300, userId: 1300 });
+    await harness.sendText('как добраться до места', { chatId: 1300, userId: 1300 });
+    const byText = harness.lastText(1300);
+    assert.ok(byText.trim().length > 0);
+  });
+
+  it('неизвестный ввод не оставляет пользователя без ответа', async () => {
+    harness.clearSent();
+    await harness.sendText('абракадабра-без-смысла', { chatId: 1400, userId: 1400 });
+    const answer = harness.lastText(1400);
+    assert.ok(answer.trim().length > 0, 'бот промолчал на непонятный текст');
+    assert.doesNotMatch(answer, /Не получилось выполнить/);
+  });
+
+  it('профиль: сохранение контакта и реквизитов', async () => {
+    harness.clearSent();
+    await harness.click('profile:contact', { chatId: 1500, userId: 1500 });
+    await harness.sendText('+7 900 000-11-22', { chatId: 1500, userId: 1500 });
+    const withContact = await harness.base.profiles.get(1500);
+    assert.equal(withContact?.contact, '+7 900 000-11-22');
+
+    await harness.click('profile:payment', { chatId: 1500, userId: 1500 });
+    await harness.sendText('Тинькофф', { chatId: 1500, userId: 1500 });
+    await harness.sendText('+7 900 000-11-22', { chatId: 1500, userId: 1500 });
+    const withDetails = await harness.base.profiles.get(1500);
+    assert.equal(withDetails?.bankName, 'Тинькофф');
+    assert.equal(withDetails?.paymentHandle, '+7 900 000-11-22');
+  });
+});
