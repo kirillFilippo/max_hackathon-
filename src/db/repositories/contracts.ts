@@ -49,6 +49,13 @@ export interface EventPatch {
 }
 
 export interface EventsRepository {
+  /**
+   * Критическая секция по событию: пока одна операция считает состав или нумерует
+   * позиции, вторая ждёт. Нужна там, где решение зависит от предварительного чтения
+   * (лимит мест, лист ожидания, номер позиции в списке покупок), а сама база такой
+   * инвариант не держит. Вложенные вызовы недопустимы — это взаимная блокировка.
+   */
+  withLock<T>(eventId: string, work: () => Promise<T>): Promise<T>;
   create(input: CreateEventRecord, attempts?: number): Promise<DosugEvent>;
   findById(id: string): Promise<DosugEvent | null>;
   findByCode(code: string): Promise<DosugEvent | null>;

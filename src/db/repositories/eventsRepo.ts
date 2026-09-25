@@ -3,6 +3,7 @@ import { normalizeFields } from '../../domain/questionnaire.js';
 import type { AnswerMode, DosugEvent, EventField, EventStatus } from '../../domain/types.js';
 import { toIso, toIsoOrNull, toNumberOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
+import { KeyedLocks } from '../locks.js';
 import type { CreateEventRecord, EventPatch, EventsRepository } from './contracts.js';
 
 interface EventRow {
@@ -48,7 +49,18 @@ const mapEvent = (row: EventRow): DosugEvent => ({
 });
 
 export class EventsRepo implements EventsRepository {
+  private readonly locks = new KeyedLocks();
+
   constructor(private readonly db: Db) {}
+
+  /**
+   * Критическая секция по событию: считаем места и номера позиций по очереди.
+   * Блокировка живёт в процессе (см. `db/locks.ts`): транзакция с advisory-локом
+   * заняла бы соединение из пула и под нагрузкой могла бы заклинить пул целиком.
+   */
+  withLock<T>(eventId: string, work: () => Promise<T>): Promise<T> {
+    return this.locks.run(eventId, work);
+  }
 
   /** Создаёт событие, подбирая свободный короткий код. */
   async create(input: CreateEventRecord, attempts = 12): Promise<DosugEvent> {

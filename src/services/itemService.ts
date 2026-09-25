@@ -22,9 +22,13 @@ export interface ReserveOutcome {
 export class ItemService {
   constructor(private readonly repos: Repositories) {}
 
-  /** Добавляет позиции: каждая строка ввода — отдельный предмет. */
+  /**
+   * Добавляет позиции: каждая строка ввода — отдельный предмет.
+   * Нумерация идёт от максимального номера, поэтому добавление идёт под замком
+   * события: иначе два одновременных добавления получат одинаковые номера.
+   */
   async add(eventId: string, titles: string[]): Promise<ItemWithReservation[]> {
-    return this.repos.items.addMany(eventId, titles);
+    return this.repos.events.withLock(eventId, () => this.repos.items.addMany(eventId, titles));
   }
 
   list(eventId: string): Promise<ItemWithReservation[]> {

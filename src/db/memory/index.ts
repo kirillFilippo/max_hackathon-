@@ -1,3 +1,4 @@
+import { KeyedLocks } from '../locks.js';
 import { newEventCode, newEventId, newItemId, newParticipantId, newTemplateId, newTransferId } from '../../domain/ids.js';
 import { normalizeFields } from '../../domain/questionnaire.js';
 import type {
@@ -125,7 +126,14 @@ const mapUser = (user: StoredUserProfile): UserProfile => ({
 });
 
 export class MemoryEventsRepository implements EventsRepository {
+  /** Та же очередь критических секций, что и в PostgreSQL-реализации. */
+  private readonly locks = new KeyedLocks();
+
   constructor(private readonly store: MemoryStore) {}
+
+  withLock<T>(eventId: string, work: () => Promise<T>): Promise<T> {
+    return this.locks.run(eventId, work);
+  }
 
   /** Создаёт событие, подбирая свободный короткий код (в БД это UNIQUE). */
   async create(input: CreateEventRecord, attempts = 12): Promise<DosugEvent> {

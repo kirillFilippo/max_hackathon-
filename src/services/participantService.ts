@@ -59,35 +59,36 @@ export class ParticipantService {
     }
     const normalized: SaveRegistrationInput = { ...input, answers: validation.answers };
 
-    const participants = await this.repos.participants.listByEvent(normalized.event.id);
-    const existing = participants.find((participant) => participant.userId === normalized.userId);
-    const limit = normalized.event.limit;
-    const goingNow = participants.filter(
-      (participant) =>
-        participant.userId !== normalized.userId
-        && participant.status === 'going'
-        && !participant.waitlisted,
-    ).length;
+    // Считаем места и записываем заявку под замком события: иначе две одновременные
+    // заявки на последнее место обе увидели бы «место есть» и обе попали в состав.
+    return this.repos.events.withLock(normalized.event.id, async () => {
+      const participants = await this.repos.participants.listByEvent(normalized.event.id);
+      const existing = participants.find((participant) => participant.userId === normalized.userId);
+      const limit = normalized.event.limit;
+      const goingNow = participants.filter(
+        (participant) => participant.userId !== normalized.userId && isGoing(participant),
+      ).length;
 
-    const waitlisted = normalized.status === 'going' && limit !== null && goingNow >= limit;
+      const waitlisted = normalized.status === 'going' && limit !== null && goingNow >= limit;
 
-    const participant = await this.repos.participants.upsert({
-      eventId: normalized.event.id,
-      userId: normalized.userId,
-      name: normalized.name,
-      username: normalized.username,
-      contact: normalized.contact,
-      status: normalized.status,
-      answers: normalized.answers,
-      waitlisted,
+      const participant = await this.repos.participants.upsert({
+        eventId: normalized.event.id,
+        userId: normalized.userId,
+        name: normalized.name,
+        username: normalized.username,
+        contact: normalized.contact,
+        status: normalized.status,
+        answers: normalized.answers,
+        waitlisted,
+      });
+
+      return {
+        ok: true as const,
+        participant,
+        waitlisted,
+        limitReached: waitlisted && !existing?.waitlisted,
+      };
     });
-
-    return {
-      ok: true,
-      participant,
-      waitlisted,
-      limitReached: waitlisted && !existing?.waitlisted,
-    };
   }
 
   /**
@@ -99,29 +100,31 @@ export class ParticipantService {
     userId: number,
     status: ParticipantStatus,
   ): Promise<StatusChangeResult | null> {
-    const participants = await this.repos.participants.listByEvent(event.id);
-    const current = participants.find((participant) => participant.userId === userId);
-    if (!current) return null;
+    // Смена статуса меняет состав и может поднять человека из листа ожидания —
+    // всё это одно решение, поэтому выполняем его под замком события целиком.
+    return this.repos.events.withLock(event.id, async () => {
+      const participants = await this.repos.participants.listByEvent(event.id);
+      const current = participants.find((participant) => participant.userId === userId);
+      if (!current) return null;
 
-    const othersGoing = participants.filter(
-      (participant) =>
-        participant.userId !== userId
-        && participant.status === 'going'
-        && !participant.waitlisted,
-    ).length;
-    const waitlisted = status === 'going' && event.limit !== null && othersGoing >= event.limit;
+      const othersGoing = participants.filter(
+        (participant) => participant.userId !== userId && isGoing(participant),
+      ).length;
+      const waitlisted = status === 'going' && event.limit !== null && othersGoing >= event.limit;
 
-    const updated = await this.repos.participants.patch(event.id, userId, { status, waitlisted });
-    if (!updated) return null;
+      const updated = await this.repos.participants.patch(event.id, userId, { status, waitlisted });
+      if (!updated) return null;
 
-    let releasedItems: ItemWithReservation[] = [];
-    if (status === 'not_going') {
-      releasedItems = await this.repos.items.listReservedByUser(event.id, userId);
-      await this.repos.items.releaseAllForUser(event.id, userId);
-    }
+      let releasedItems: ItemWithReservation[] = [];
+      if (status === 'not_going') {
+        releasedItems = await this.repos.items.listReservedByUser(event.id, userId);
+        await this.repos.items.releaseAllForUser(event.id, userId);
+      }
 
-    const promoted = status === 'going' ? null : await this.promoteFromWaitlist(event);
-    return { participant: updated, waitlisted, promoted, releasedItems };
+      // Внутри замка вызываем вариант без блокировки: вложенный withLock — дедлок.
+      const promoted = status === 'going' ? null : await this.promoteUnlocked(event);
+      return { participant: updated, waitlisted, promoted, releasedItems };
+    });
   }
 
   async setAnswer(
@@ -138,17 +141,22 @@ export class ParticipantService {
   }
 
   async remove(eventId: string, userId: number): Promise<boolean> {
-    await this.repos.items.releaseAllForUser(eventId, userId);
-    return this.repos.participants.delete(eventId, userId);
+    return this.repos.events.withLock(eventId, async () => {
+      await this.repos.items.releaseAllForUser(eventId, userId);
+      return this.repos.participants.delete(eventId, userId);
+    });
   }
 
   /** Поднимает первого из листа ожидания, если есть свободное место. */
   async promoteFromWaitlist(event: DosugEvent): Promise<Participant | null> {
+    return this.repos.events.withLock(event.id, () => this.promoteUnlocked(event));
+  }
+
+  /** То же без замка: вызывается из методов, которые уже держат замок события. */
+  private async promoteUnlocked(event: DosugEvent): Promise<Participant | null> {
     if (event.limit === null) return null;
     const participants = await this.repos.participants.listByEvent(event.id);
-    const going = participants.filter(
-      isGoing,
-    ).length;
+    const going = participants.filter(isGoing).length;
     if (going >= event.limit) return null;
 
     const candidate = participants.find((participant) => participant.waitlisted);
