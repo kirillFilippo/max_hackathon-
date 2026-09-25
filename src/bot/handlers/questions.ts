@@ -60,7 +60,7 @@ export const openQuestionsApp = async (
   }
 
   const ticket = newTicket();
-  deps.miniapp.registerTicket(ticket, { userId: userIdOf(ctx), at: Date.now() });
+  await deps.miniapp.registerTicket(ticket, { userId: userIdOf(ctx), at: Date.now() });
   const username = botUsernameOf(ctx, deps);
   const rows: KeyboardRows = [];
 

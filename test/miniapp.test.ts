@@ -58,7 +58,7 @@ before(async () => {
       savedAnswers.push(submission);
       return { ok: true };
     },
-    takeTicket: (ticket) => {
+    takeTicket: async (ticket) => {
       const at = validTickets.get(ticket);
       if (at === undefined) return null;
       return { userId: 7, at };
@@ -317,7 +317,7 @@ describe('Анкета участника в мини-приложении', () 
       port: 0,
       botToken: 'test-bot-token',
       devMode: true,
-      takeTicket: () => null,
+      takeTicket: async () => null,
       onFieldsSaved: async () => undefined,
       getDraft: async () => null,
       getQuestionnaire: async () => null,

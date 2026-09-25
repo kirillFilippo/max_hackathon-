@@ -81,7 +81,7 @@ export interface MiniappDeps {
   getQuestionnaire: (code: string, userId: number | null) => Promise<QuestionnairePayload | null>;
   saveAnswers: (submission: AnswerSubmission) => Promise<AnswerSaveResult>;
   /** Проверяет одноразовую подпись мастера (или null, если она истекла/неизвестна). */
-  takeTicket: (ticket: string) => MiniappTicket | null;
+  takeTicket: (ticket: string) => Promise<MiniappTicket | null>;
   /** Текущий черновик организатора: его конструктор подтягивает по подписи. */
   getDraft: (userId: number) => Promise<MiniappDraft | null>;
   /** Вызывается ботом: сохранить поля в черновик организатора и обновить сообщение. */
@@ -222,7 +222,7 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
         // Черновик вопросов отдаём по подписи: URL конструктора остаётся коротким,
         // а повторное открытие не теряет уже собранные вопросы.
         const ticketValue = url.searchParams.get('t') ?? '';
-        const ticket = ticketValue ? deps.takeTicket(ticketValue) : null;
+        const ticket = ticketValue ? await deps.takeTicket(ticketValue) : null;
         if (!ticket) {
           json(res, 403, { error: 'Ссылка конструктора устарела. Откройте её заново из чата с ботом.' });
           return;
@@ -351,7 +351,7 @@ export const startMiniappServer = async (deps: MiniappDeps): Promise<MiniappHand
         }
 
         const ticketValue = typeof parsed.ticket === 'string' ? parsed.ticket : '';
-        const ticket = ticketValue ? deps.takeTicket(ticketValue) : null;
+        const ticket = ticketValue ? await deps.takeTicket(ticketValue) : null;
         if (!ticket) {
           json(res, 403, { error: 'Ссылка конструктора устарела. Откройте её заново из чата с ботом.' });
           return;

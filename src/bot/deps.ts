@@ -40,6 +40,7 @@ export interface AppDeps {
 export interface MiniappBridge {
   /** Ссылка на конструктор: только одноразовая подпись, черновик страница берёт сама. */
   buildUrl: (ticket: string) => string;
-  registerTicket: (ticket: string, owner: { userId: number; at: number }) => void;
-  takeTicket: (ticket: string) => { userId: number; at: number } | null;
+  /** Подпись конструктора живёт в хранилище сессий: рестарт бота её не теряет. */
+  registerTicket: (ticket: string, owner: { userId: number; at: number }) => Promise<void>;
+  takeTicket: (ticket: string) => Promise<{ userId: number; at: number } | null>;
 }

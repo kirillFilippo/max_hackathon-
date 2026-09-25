@@ -33,6 +33,7 @@ import { formatDateTime } from './domain/datetime.js';
 import { STATUS_LABELS } from './domain/types.js';
 import { registrationNotice } from './bot/texts/registration.js';
 import { applyMiniappFields, readDraftQuestionnaire } from './bot/handlers/miniappSync.js';
+import { createMiniappTicketStore } from './bot/miniappTickets.js';
 import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
 
 export const BOT_COMMANDS = [
@@ -80,9 +81,8 @@ export const createApp = async (
   const notifier = createApiNotifier(bot.api);
 
   // Мини-приложение конструктора вопросов: включается, если задан MINIAPP_URL.
-  // Одноразовые подписи конструктора вопросов: живут ограниченное время.
-  const tickets = new Map<string, { userId: number; at: number }>();
-  const TICKET_TTL_MS = 15 * 60 * 1000;
+  // Подписи конструктора живут в хранилище сессий: переживают перезапуск и деплой.
+  const tickets = createMiniappTicketStore(storage.sessions);
   let miniapp: MiniappHandle | null = null;
   let miniappBridge: AppDeps['miniapp'] = null;
 
@@ -189,35 +189,15 @@ export const createApp = async (
         logger.info(`Заявка из мини-приложения: событие ${event.code}, участник ${submission.userId}`);
         return { ok: true };
       },
-      takeTicket: (ticket) => {
-        // Не гасим сразу: при ошибке валидации организатор может исправить данные
-        // и нажать «Сохранить» ещё раз, пока тикет не истёк.
-        const owner = tickets.get(ticket);
-        if (!owner) return null;
-        if (Date.now() - owner.at > TICKET_TTL_MS) {
-          tickets.delete(ticket);
-          return null;
-        }
-        return owner;
-      },
+      takeTicket: tickets.take,
       getDraft: (userId) => readDraftQuestionnaire(deps, userId),
       onFieldsSaved: (userId, fields, answerMode, name) =>
         applyMiniappFields(deps, userId, fields, answerMode, name),
     });
     miniappBridge = {
       buildUrl: (ticket) => miniapp!.buildUrl(ticket),
-      registerTicket: (ticket, owner) => {
-        tickets.set(ticket, owner);
-      },
-      takeTicket: (ticket) => {
-        const owner = tickets.get(ticket);
-        if (!owner) return null;
-        if (Date.now() - owner.at > TICKET_TTL_MS) {
-          tickets.delete(ticket);
-          return null;
-        }
-        return owner;
-      },
+      registerTicket: tickets.register,
+      takeTicket: tickets.take,
     };
     deps.miniapp = miniappBridge;
     logger.info(`Мини-приложение вопросов: ${config.miniappUrl} (локальный порт ${miniapp.port})`);

@@ -433,8 +433,8 @@ describe('Вопросы: выбор готового набора и кнопк
     const tickets: string[] = [];
     harness.deps.miniapp = {
       buildUrl: (ticket: string) => `https://example.test/app/questions?t=${ticket}`,
-      registerTicket: (ticket: string) => { tickets.push(ticket); },
-      takeTicket: () => null,
+      registerTicket: async (ticket: string) => { tickets.push(ticket); },
+      takeTicket: async () => null,
     };
     try {
       await gotoFields();
