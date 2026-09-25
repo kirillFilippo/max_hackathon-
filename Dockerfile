@@ -25,6 +25,10 @@ ENV NODE_ENV=production
 # образ и бот работают на системных сертификатах. Если потребуется — см. README.
 RUN apk add --no-cache ca-certificates tzdata
 
+# Каталог для снимка памяти на время обрыва связи с базой (OFFLINE_STATE_PATH).
+# Создаём до смены пользователя: том compose унаследует владельца node.
+RUN mkdir -p /app/data
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 

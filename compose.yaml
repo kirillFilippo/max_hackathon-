@@ -46,6 +46,9 @@ services:
       MAX_CA_CERT_PATH: /app/certs/russian-trusted-root-ca.pem
     volumes:
       - ./certs:/app/certs:ro
+      # Снимок данных, созданных пока база была недоступна: переживает
+      # пересоздание контейнера и уезжает в PostgreSQL после восстановления связи.
+      - offline:/app/data
     ports:
       # Нужен только для BOT_MODE=webhook (long polling портов не требует).
       - "${WEBHOOK_PORT:-8080}:8080"
@@ -57,3 +60,4 @@ services:
 
 volumes:
   pgdata:
+  offline:
