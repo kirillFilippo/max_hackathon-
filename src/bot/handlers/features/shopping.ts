@@ -43,6 +43,7 @@ export const showMyItems = async (
   if (!event) return;
   rememberShop(ctx, event.code);
   const items = await deps.items.mine(event.id, userIdOf(ctx));
+  deps.logger.info(`[shop] пользователь ${userIdOf(ctx)} освободил позицию ${itemId} в «${event.code}»`);
   await show(ctx, myItems(event, items));
 };
 
@@ -60,6 +61,15 @@ export const takeItem = async (
   const name = await participantNameFor(ctx, deps, event.id);
   const result = await deps.items.reserveItem(event, itemId, user.user_id, name);
   const items = await deps.items.list(event.id);
+
+  deps.logger.info(
+    `[shop] ${name} (id ${user.user_id}) в «${event.code}»: `
+    + (result.reserved
+      ? `взял позицию ${items.find((item) => item.id === itemId)?.title ?? itemId}`
+      : result.alreadyMine
+        ? 'позиция уже была за ним'
+        : `позиция занята: ${result.takenBy ?? 'другой участник'}`),
+  );
 
   const outcome = {
     reserved: result.reserved ? items.filter((item) => item.id === itemId) : [],
@@ -102,6 +112,11 @@ export const reserveByNumbersText = async (
   const user = requireUser(ctx);
   const name = await participantNameFor(ctx, deps, event.id);
   const outcome = await deps.items.reserveByNumbers(event, user.user_id, name, numbers);
+  deps.logger.info(
+    `[shop] ${name} (id ${user.user_id}) в «${event.code}» отправил номера ${numbers.join(', ')}: `
+    + `взял ${outcome.reserved.length}, занято другими ${outcome.taken.length}, `
+    + `уже было ${outcome.alreadyMine.length}, нет в списке ${outcome.unknown.length}`,
+  );
   const items = await deps.items.list(event.id);
   await show(ctx, reserveResult(event, outcome, items, userIdOf(ctx)));
 };
