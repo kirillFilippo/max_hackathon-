@@ -7,16 +7,11 @@ import { registerHandlers } from './bot/handlers/index.js';
 import { createApiNotifier } from './bot/notifier.js';
 import type { BotSession } from './bot/session.js';
 import { runReminderTick, type ReminderRunResult } from './bot/reminderRunner.js';
-import {
-  ensureSubscription,
-  startSubscriptionWatchdog,
-  type WatchdogHandle,
-} from './bot/subscriptionWatchdog.js';
+import { ensureSubscription, startSubscriptionWatchdog, type WatchdogHandle } from './bot/subscriptionWatchdog.js';
 import { assertRunnableConfig, type AppConfig } from './config.js';
 import type { Db } from './db/pool.js';
 import type { PgSessionStore } from './db/sessions.js';
 import { createStorage } from './db/storage.js';
-import { newFieldId } from './domain/ids.js';
 import { createLogger, type Logger } from './logger.js';
 import { EventService } from './services/eventService.js';
 import { ItemService } from './services/itemService.js';
@@ -26,13 +21,9 @@ import { DebugService } from './services/debugService.js';
 import { ReminderService } from './services/reminderService.js';
 import { SettlementService } from './services/settlementService.js';
 import { TemplateService } from './services/templateService.js';
-import { startMiniappServer, type MiniappField, type MiniappHandle } from './miniapp/server.js';
-import { normalizeField } from './domain/questionnaire.js';
+import { type MiniappHandle } from './miniapp/server.js';
 import type { AnswerMode } from './domain/types.js';
-import { formatDateTime } from './domain/datetime.js';
-import { STATUS_LABELS } from './domain/types.js';
-import { registrationNotice } from './bot/texts/registration.js';
-import { applyMiniappFields, readDraftQuestionnaire } from './bot/handlers/miniappSync.js';
+import { startMiniappBridge } from './app/miniappBridge.js';
 import { fetchBotInfo, publishCommands } from './bot/botInfo.js';
 import { createMiniappTicketStore } from './bot/miniappTickets.js';
 import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
@@ -124,86 +115,22 @@ export const createApp = async (
   };
 
   if (config.miniappUrl) {
-    miniapp = await startMiniappServer({
-      logger: logger.child('miniapp'),
-      baseUrl: config.miniappUrl,
+    const started = await startMiniappBridge({
+      config,
+      logger,
+      storage,
+      bot,
+      notifier,
+      deps,
+      miniappUrl: config.miniappUrl,
+      tickets,
       webhookPath,
       webhookHandler: webhookHandler ?? undefined,
-      port: config.miniappPort,
-      botToken: config.botToken,
-      devMode: config.miniappDev,
-      health: () => ({
-        ok: true,
-        storage: storage.stats(),
-        db: storage.monitor.current(),
-      }),
-      getQuestionnaire: async (code, userId) => {
-        const event = await events.findByCode(code);
-        if (!event) return null;
-        const [participant, profile] = await Promise.all([
-          userId === null ? Promise.resolve(null) : participants.find(event.id, userId),
-          userId === null ? Promise.resolve(null) : profiles.get(userId),
-        ]);
-        return {
-          event: {
-            code: event.code,
-            title: event.title,
-            startsAt: formatDateTime(event.startsAt, config.appTz),
-            place: event.place,
-          },
-          fields: event.fields,
-          me: {
-            name: participant?.name ?? profile?.name ?? '',
-            contact: participant?.contact ?? profile?.contact ?? '',
-            status: participant?.status ?? 'going',
-            answers: participant?.answers ?? {},
-          },
-        };
-      },
-      saveAnswers: async (submission) => {
-        const event = await events.findByCode(submission.code);
-        if (!event) return { ok: false, error: `Событие ${submission.code} не найдено` };
-        const result = await participants.save({
-          event,
-          userId: submission.userId,
-          name: submission.name,
-          username: submission.username,
-          contact: submission.contact,
-          status: submission.status,
-          answers: submission.answers,
-        });
-        if (!result.ok) {
-          return { ok: false, error: result.error, fieldId: result.failedField.id };
-        }
-        if (submission.contact) await profiles.saveContact(submission.userId, submission.contact);
-
-        const notification = registrationNotice(event, {
-          name: result.participant.name,
-          contact: result.participant.contact,
-          statusLabel: STATUS_LABELS[result.participant.status],
-          waitlisted: result.waitlisted,
-          answers: result.participant.answers,
-        });
-        try {
-          await notifier.sendToUser(event.organizerId, notification);
-        } catch (error) {
-          logger.warn('Не удалось уведомить организатора о заявке из мини-приложения', error);
-        }
-        logger.info(`Заявка из мини-приложения: событие ${event.code}, участник ${submission.userId}`);
-        return { ok: true };
-      },
-      takeTicket: tickets.take,
-      getDraft: (userId) => readDraftQuestionnaire(deps, userId),
-      onFieldsSaved: (userId, fields, answerMode, name) =>
-        applyMiniappFields(deps, userId, fields, answerMode, name),
     });
-    miniappBridge = {
-      buildUrl: (ticket) => miniapp!.buildUrl(ticket),
-      registerTicket: tickets.register,
-      takeTicket: tickets.take,
-    };
+    miniapp = started.handle;
+    miniappBridge = started.bridge;
     deps.miniapp = miniappBridge;
-    logger.info(`Мини-приложение вопросов: ${config.miniappUrl} (локальный порт ${miniapp.port})`);
+    logger.info(`Мини-приложение вопросов: ${config.miniappUrl} (локальный порт ${started.handle.port})`);
   }
 
   registerHandlers(bot, deps, sessionStore);
