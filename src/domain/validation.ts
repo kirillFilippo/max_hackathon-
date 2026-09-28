@@ -126,7 +126,9 @@ export const validateAnswer = (field: EventField, input: string | null | undefin
   const raw = input ?? '';
 
   if (isBlank(raw)) {
-    if (field.required) return { ok: false, error: 'Вопрос обязательный: ответьте или сделайте его необязательным.' };
+    if (field.required) {
+      return { ok: false, error: 'Это обязательный вопрос — без ответа заявка не уйдёт.' };
+    }
     return { ok: true, value: '' };
   }
 

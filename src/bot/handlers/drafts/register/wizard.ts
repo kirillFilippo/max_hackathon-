@@ -7,6 +7,7 @@ import type { DraftState, RegisterStep } from '../../../session.js';
 import { findEventOrNotify, menuRow, userIdOf } from '../../helpers.js';
 import { callbackArgs } from '../fieldsScreen.js';
 import {
+  cancelNotice,
   contactPrompt,
   namePrompt,
   registerFieldPrompt,
@@ -28,6 +29,10 @@ export const registerDraftOwnsCallback = (
   const sub = args[0] ?? '';
   // Отмена и «Заполнить заново» относятся к мастеру на любом шаге.
   if (sub === 'cancel' || sub === 'start') return true;
+  // Имя и контакт мастер принимает на любом шаге: кнопка из старого сообщения
+  // не должна «проваливаться» в общий роутер и оставлять пользователя без ответа —
+  // шаг в этом случае просто не откатывается (см. ветки name/contact ниже).
+  if (sub === 'name' || sub === 'contact') return true;
 
   switch (step) {
     case 'name':
@@ -56,6 +61,14 @@ export const handleRegisterDraft = async (
   const { action, args } = callbackArgs(ctx);
   const input = userText(ctx);
 
+  // Отмена относится к мастеру целиком, а не к отдельному шагу: раньше она была
+  // только на шаге подтверждения, и на остальных кнопка молча ничего не делала.
+  if (isCallback && action === 'reg' && args[0] === 'cancel') {
+    if (ctx.session) ctx.session.draft = null;
+    await show(ctx, withKeyboard(cancelNotice(), menuRow));
+    return true;
+  }
+
   const event = await findEventOrNotify(ctx, deps, draft.data.eventCode);
   if (!event) {
     if (ctx.session) ctx.session.draft = null;
@@ -75,8 +88,11 @@ export const handleRegisterDraft = async (
   switch (draft.step) {
     case 'name': {
       if (isCallback && action === 'reg' && args[0] === 'name' && args[1] === 'self') {
-        const profile = await deps.profiles.get(userIdOf(ctx));
-        draft.data.participantName = profile?.name ?? ctx.user?.name ?? '';
+        // Повтор кнопки из старого сообщения: имя уже принято — шаг не откатываем.
+        if (!draft.data.participantName) {
+          const profile = await deps.profiles.get(userIdOf(ctx));
+          draft.data.participantName = profile?.name ?? ctx.user?.name ?? '';
+        }
       } else if (input) {
         draft.data.participantName = input.slice(0, 80);
       } else {
@@ -90,8 +106,12 @@ export const handleRegisterDraft = async (
     }
 
     case 'contact': {
-      if (isCallback && action === 'reg' && args[0] === 'contact' && args[1] === 'skip') {
+      // «Пропустить» из старого сообщения: контакт уже принят — оставляем как есть.
+      if (isCallback && action === 'reg' && args[0] === 'contact' && args[1] === 'skip'
+        && draft.data.contact === undefined) {
         draft.data.contact = '';
+      } else if (isCallback && action === 'reg' && args[0] === 'contact') {
+        // ничего не меняем, идём дальше
       } else {
         const fromContact = ctx.contactInfo?.tel;
         const value = fromContact ?? input;
@@ -100,6 +120,12 @@ export const handleRegisterDraft = async (
           return true;
         }
         draft.data.contact = value.slice(0, 120);
+      }
+
+      // Повтор старой кнопки «Пропустить»/контакта: шаг уже пройден — не откатываем.
+      if (isCallback && draft.data.status) {
+        await goToFieldsOrConfirm(ctx, deps, event, draft);
+        return true;
       }
 
       if (draft.data.status) {
@@ -112,17 +138,36 @@ export const handleRegisterDraft = async (
     }
 
     case 'status': {
-      if (!isCallback || action !== 'reg' || args[0] !== 'status') {
-        await show(ctx, statusPrompt(event));
+      if (isCallback && action === 'reg' && args[0] === 'status') {
+        const status = (args[2] ?? '') as ParticipantStatus | '';
+        // Статус уже выбран: повторное нажатие той же кнопки не должно
+        // переспрашивать — иначе на медленном клиенте вопрос возвращается.
+        if (status && status in STATUS_LABELS) {
+          if (draft.data.status === status) {
+            await show(ctx, statusPrompt(event));
+            return true;
+          }
+          draft.data.status = status;
+          await goToFieldsOrConfirm(ctx, deps, event, draft);
+          return true;
+        }
+      }
+
+      // Кнопка пришла от старого сообщения (шаг уже сменился) — показываем, что
+      // происходит сейчас, а не задаём вопрос заново.
+      if (isCallback && draft.data.status) {
+        await show(
+          ctx,
+          withKeyboard(
+            `Статус уже выбран: ${STATUS_LABELS[draft.data.status]}. Продолжаем заполнение заявки.`,
+            menuRow,
+          ),
+        );
+        await goToFieldsOrConfirm(ctx, deps, event, draft);
         return true;
       }
-      const status = args[2] as ParticipantStatus | undefined;
-      if (!status || !(status in STATUS_LABELS)) {
-        await show(ctx, statusPrompt(event));
-        return true;
-      }
-      draft.data.status = status;
-      await goToFieldsOrConfirm(ctx, deps, event, draft);
+
+      await show(ctx, statusPrompt(event));
       return true;
     }
 
@@ -225,11 +270,6 @@ export const handleRegisterDraft = async (
     default: {
       if (isCallback && action === 'reg' && args[0] === 'confirm') {
         await saveRegistration(ctx, deps, event, draft);
-        return true;
-      }
-      if (isCallback && action === 'reg' && args[0] === 'cancel') {
-        if (ctx.session) ctx.session.draft = null;
-        await show(ctx, withKeyboard('Заявка отменена. Вернуться можно по ссылке или командой /join.', menuRow));
         return true;
       }
       await renderConfirm(ctx, deps, event, draft.data);

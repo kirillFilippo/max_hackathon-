@@ -120,3 +120,103 @@ describe('Подтверждение участия кнопками', () => {
     assert.equal(updated?.status, 'going');
   });
 });
+
+describe('Отмена и повторные нажатия в мастере заявки', () => {
+  let harness: BotHarness;
+
+  before(async () => {
+    harness = await createBotHarness();
+  });
+
+  after(async () => {
+    await harness.stop();
+  });
+
+  const setup = async () =>
+    harness.base.events.create({
+      title: 'Настолки',
+      description: '',
+      startsAt: hoursFromNow(48),
+      place: 'кафе',
+      placeCoords: null,
+      limit: null,
+      fields: [],
+      answerMode: 'auto',
+      organizerId: 3300,
+      organizerName: 'Оля',
+    });
+
+  it('«Отмена» работает на каждом шаге мастера', async () => {
+    for (const [chatId, prepare] of [
+      [3301, async (code: string) => { await harness.click(`reg:begin:${code}`, { chatId: 3301, userId: 3301 }); }],
+      [3302, async (code: string) => {
+        await harness.click(`reg:begin:${code}`, { chatId: 3302, userId: 3302 });
+        await harness.sendText('Аня', { chatId: 3302, userId: 3302 });
+      }],
+      [3303, async (code: string) => {
+        await harness.click(`reg:begin:${code}`, { chatId: 3303, userId: 3303 });
+        await harness.sendText('Аня', { chatId: 3303, userId: 3303 });
+        await harness.click('reg:contact:skip', { chatId: 3303, userId: 3303 });
+      }],
+    ] as Array<[number, (code: string) => Promise<void>]>) {
+      harness.clearSent();
+      const event = await setup();
+      await harness.start(`ev_${event.code}`, { chatId, userId: chatId });
+      await prepare(event.code);
+
+      await harness.click('reg:cancel', { chatId, userId: chatId });
+      assert.match(harness.lastText(chatId), /Заявка отменена/, `отмена не сработала в чате ${chatId}`);
+
+      // Черновик снят: следующий текст обрабатывается как обычное сообщение.
+      harness.clearSent();
+      await harness.sendText('привет', { chatId, userId: chatId });
+      assert.doesNotMatch(harness.lastText(chatId), /Как вас записать|Контакт для связи|Вы придёте/);
+    }
+  });
+
+  it('повторное «Иду» не возвращает вопрос про участие', async () => {
+    harness.clearSent();
+    const event = await setup();
+    const chatId = 3310;
+
+    await harness.start(`ev_${event.code}`, { chatId, userId: chatId });
+    await harness.click(`reg:begin:${event.code}`, { chatId, userId: chatId });
+    await harness.sendText('Вика', { chatId, userId: chatId });
+    await harness.click('reg:contact:skip', { chatId, userId: chatId });
+
+    // Двойной тап и осознанный повтор той же кнопки.
+    await harness.click(`reg:status:${event.code}:going`, { chatId, userId: chatId, rapid: true });
+    await harness.click(`reg:status:${event.code}:going`, { chatId, userId: chatId, rapid: true });
+    await harness.click(`reg:status:${event.code}:going`, { chatId, userId: chatId });
+
+    const screens = harness.texts(chatId);
+    const confirmAt = screens.findIndex((text) => text.startsWith('Проверьте заявку'));
+    assert.ok(confirmAt >= 0, 'мастер не дошёл до подтверждения заявки');
+    assert.deepEqual(
+      screens.slice(confirmAt + 1).filter((text) => text.includes('Вы придёте?')),
+      [],
+      'вопрос про участие вернулся после выбора статуса',
+    );
+  });
+
+  it('повтор кнопок «имя» и «контакт» из старого сообщения не откатывает шаг', async () => {
+    harness.clearSent();
+    const event = await setup();
+    const chatId = 3320;
+
+    await harness.start(`ev_${event.code}`, { chatId, userId: chatId });
+    await harness.click(`reg:begin:${event.code}`, { chatId, userId: chatId });
+    await harness.sendText('Гриша', { chatId, userId: chatId });
+    await harness.click('reg:contact:skip', { chatId, userId: chatId });
+    await harness.click(`reg:status:${event.code}:going`, { chatId, userId: chatId });
+
+    // Старые кнопки из предыдущих сообщений: мастер должен остаться на месте.
+    harness.clearSent();
+    await harness.click('reg:contact:skip', { chatId, userId: chatId, mid: 'old-contact' });
+    await harness.click(`reg:name:${event.code}`, { chatId, userId: chatId, mid: 'old-name' });
+
+    const after = harness.texts(chatId).join('\n');
+    assert.match(after, /Проверьте заявку|Статус уже выбран/);
+    assert.doesNotMatch(after, /Как вас записать/);
+  });
+});

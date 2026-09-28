@@ -99,6 +99,9 @@ describe('Мини-приложение конструктора вопросо�
     assert.match(html, /app\/draft\?t=/);
     assert.match(html, /Загрузка…/);
     assert.match(html, /Сохраняем…/);
+    // Формулировки для организатора: понятно, что снимать галочку — осознанно.
+    assert.match(html, /Ответ обязателен/);
+    assert.match(html, /Вопросы обязательные по умолчанию/);
     assert.match(html, /saveButton\.disabled = true/);
     assert.match(html, /Вернуться в чат/);
     // Настройка способа ответа спрятана в свёрнутый блок, но доступна организатору.

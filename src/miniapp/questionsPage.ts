@@ -72,7 +72,8 @@ export const renderMiniappHtml = (options: { title: string }): string => `<!DOCT
 </head>
 <body>
 <h1>Вопросы участникам</h1>
-<div class="hint">Отвечают участники при регистрации. Максимум ${MINIAPP_MAX_FIELDS} вопросов.</div>
+<div class="hint">Отвечают участники при регистрации. Максимум ${MINIAPP_MAX_FIELDS} вопросов.
+Вопросы обязательные по умолчанию: снимите галочку, если ответ можно пропустить.</div>
 
 <div class="card">
   <label for="name">Название набора</label>
@@ -307,7 +308,7 @@ const render = () => {
     requiredInput.checked = field.required !== false;
     requiredInput.onchange = () => { field.required = requiredInput.checked; };
     const requiredText = document.createElement('span');
-    requiredText.textContent = 'Обязательный вопрос';
+    requiredText.textContent = 'Ответ обязателен';
     required.append(requiredInput, requiredText);
     card.appendChild(required);
 

@@ -86,6 +86,10 @@ export const contactPrompt = (event: DosugEvent): MessageContent =>
     ],
   );
 
+/** Одна формулировка отмены заявки: показывается на любом шаге мастера. */
+export const cancelNotice = (): string =>
+  'Заявка отменена. Вернуться можно по ссылке-приглашению или командой /join.';
+
 export const statusPrompt = (event: DosugEvent): MessageContent =>
   withKeyboard('Вы придёте?', [
     ...statusRow(event.code),
