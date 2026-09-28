@@ -12,13 +12,13 @@ services:
     image: postgres:16-alpine
     container_name: dosug-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?задайте в .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте в .env}
-      POSTGRES_DB: ${POSTGRES_DB:?задайте в .env}
+      POSTGRES_USER: ${POSTGRES_USER:-dosug}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dosug}
+      POSTGRES_DB: ${POSTGRES_DB:-dosug}
     volumes:
       - dbdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dosug} -d ${POSTGRES_DB:-dosug}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -42,7 +42,9 @@ services:
         required: false
     environment:
       # Внутри compose база доступна по имени сервиса.
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Значения по умолчанию — чтобы файл был самодостаточным: реальные
+      # параметры базы всё равно приходят из ../.env.
+      DATABASE_URL: postgres://${POSTGRES_USER:-dosug}:${POSTGRES_PASSWORD:-dosug}@postgres:5432/${POSTGRES_DB:-dosug}
       DATA_DIR: /app/data
       MINIAPP_PORT: "8090"
       # Сертификат MAX (Russian Trusted Root CA) уже внутри образа:
