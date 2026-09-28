@@ -13,5 +13,8 @@ npm-debug.log*
 .tmp-tests/
 certs/*.pem
 certs/*.crt
+# Публичный корневой сертификат (Russian Trusted Root CA) лежит в репозитории:
+# он не секрет, а без него Node не доверяет platform-api2.max.ru.
+!certs/russian-trusted-root-ca.pem
 .npm-cache/
 .deploy/

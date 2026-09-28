@@ -16,4 +16,5 @@ docs
 .tmp-tests
 certs/*.pem
 certs/*.crt
+!certs/russian-trusted-root-ca.pem
 .npm-cache

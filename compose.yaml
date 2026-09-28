@@ -35,15 +35,13 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      # .env не обязателен: без него бот поднимется, но BOT_TOKEN нужно передать
+      # переменной окружения (BOT_TOKEN=... docker compose up --build).
+      - path: .env
+        required: false
     environment:
       # Внутри compose база доступна по имени сервиса.
       DATABASE_URL: postgres://${POSTGRES_USER:-dosug}:${POSTGRES_PASSWORD:-dosug}@postgres:5432/${POSTGRES_DB:-dosug}
-      # ─── Сертификаты (опционально) ──────────────────────────────────────────
-      # Каталог ./certs монтируется в контейнер. Если в нём есть файл
-      # russian-trusted-root-ca.pem, бот сам перезапустится с NODE_EXTRA_CA_CERTS.
-      # Если файла нет — бот работает на системных сертификатах, ничего не падает.
-      MAX_CA_CERT_PATH: /app/certs/russian-trusted-root-ca.pem
     # DNS внутри контейнера: публичные резолверы из домашней сети периодически
     # не отвечают (в логах — EAI_AGAIN), поэтому первым идёт роутер, вторым —
     # публичный адрес на случай, если роутер недоступен.
@@ -51,7 +49,6 @@ services:
       - ${DNS_PRIMARY:-192.168.0.1}
       - ${DNS_SECONDARY:-1.1.1.1}
     volumes:
-      - ./certs:/app/certs:ro
       # Снимок данных, созданных пока база была недоступна: переживает
       # пересоздание контейнера и уезжает в PostgreSQL после восстановления связи.
       - offline:/app/data

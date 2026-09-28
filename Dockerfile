@@ -21,13 +21,17 @@ ENV NODE_ENV=production
 
 # ca-certificates — системное хранилище корневых сертификатов,
 # tzdata — корректная работа APP_TZ.
-# Дополнительный сертификат MAX/Минцифры встраивать НЕ обязательно:
-# образ и бот работают на системных сертификатах. Если потребуется — см. README.
 RUN apk add --no-cache ca-certificates tzdata
 
 # Каталог для снимка памяти на время обрыва связи с базой (OFFLINE_STATE_PATH).
 # Создаём до смены пользователя: том compose унаследует владельца node.
 RUN mkdir -p /app/data
+
+# Публичный корневой сертификат Russian Trusted Root CA (Минцифры) внутри образа:
+# без него Node не доверяет platform-api2.max.ru, а тянуть файл руками и
+# монтировать каталог больше не нужно — «собрал и запустил» одной командой.
+COPY certs/russian-trusted-root-ca.pem /app/certs/russian-trusted-root-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/app/certs/russian-trusted-root-ca.pem
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
