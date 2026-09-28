@@ -16,7 +16,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../src/domain/types.js';
 
@@ -121,8 +120,6 @@ const reservationRecord = (overrides: Partial<Reservation> = {}): Reservation =>
   userId: 9,
   userName: 'Вика',
   reservedAt: '2030-12-01T00:00:00.000Z',
-  paidKopecks: null,
-  paidAt: null,
   note: '',
   ...overrides,
 });
@@ -137,30 +134,12 @@ const templateRecord = (overrides: Partial<Template> = {}): Template => ({
   ...overrides,
 });
 
-const transferRecord = (overrides: Partial<TransferRequest> = {}): TransferRequest => ({
-  id: 'trf_mirror',
-  eventId: 'evt_mirror',
-  fromUserId: 2,
-  toUserId: 1,
-  amountKopecks: 1000,
-  mode: 'unset',
-  status: 'pending',
-  createdAt: '2030-12-01T00:00:00.000Z',
-  updatedAt: '2030-12-01T00:00:00.000Z',
-  notifiedAt: null,
-  detailsSentAt: null,
-  paidAt: null,
-  closedAt: null,
-  ...overrides,
-});
 
 const userProfile = (overrides: Partial<UserProfile> = {}): UserProfile => ({
   userId: 5,
   name: 'Аня',
   username: 'anya',
   contact: '+7 999 000-00-00',
-  bankName: 'Тинькофф',
-  paymentHandle: '+7 999 000-00-00',
   ...overrides,
 });
 
@@ -507,30 +486,12 @@ describe('память: список покупок', () => {
     assert.equal(await repos.items.releaseAllForUser(event.id, 42), 0);
   });
 
-  it('setPaidAmount работает только для своей брони и обнуляет paidAt вместе с суммой', async () => {
-    const repos = createMemoryRepositories();
-    const event = await repos.events.create(eventInput());
-    const [item] = await repos.items.addMany(event.id, ['Торт']);
-    await repos.items.reserve(item!.id, event.id, 1, 'Аня');
-
-    assert.equal(await repos.items.setPaidAmount(item!.id, 2, 50_000), null);
-
-    const paid = await repos.items.setPaidAmount(item!.id, 1, 50_000);
-    assert.equal(paid?.reservation?.paidKopecks, 50_000);
-    assert.notEqual(paid?.reservation?.paidAt, null);
-
-    const cleared = await repos.items.setPaidAmount(item!.id, 1, null);
-    assert.equal(cleared?.reservation?.paidKopecks, null);
-    assert.equal(cleared?.reservation?.paidAt, null);
-  });
-
   it('deleteItem удаляет позицию вместе с бронью', async () => {
     const repos = createMemoryRepositories();
     const event = await repos.events.create(eventInput());
     const added = await repos.items.addMany(event.id, ['Сок', 'Хлеб', 'Сыр']);
     const bread = added[1]!;
     await repos.items.reserve(bread.id, event.id, 1, 'Аня');
-    await repos.items.setPaidAmount(bread.id, 1, 12_000);
 
     assert.equal(await repos.items.deleteItem(bread.id), true);
     assert.equal(await repos.items.findById(bread.id), null);
@@ -547,7 +508,7 @@ describe('память: список покупок', () => {
   });
 });
 
-describe('память: шаблоны, расчёты и профили', () => {
+describe('память: шаблоны и профили', () => {
   it('шаблоны принадлежат владельцу: чужие правки не проходят', async () => {
     const repos = createMemoryRepositories();
     const created = await repos.templates.create(1, 'Пикник', [field()]);
@@ -579,72 +540,6 @@ describe('память: шаблоны, расчёты и профили', () =>
     assert.equal(await repos.templates.find(created.id), null);
   });
 
-  it('upsertMany расчётов обновляет только сумму, не сбрасывая статус и способ', async () => {
-    const repos = createMemoryRepositories();
-    const event = await repos.events.create(eventInput());
-
-    const [created] = await repos.transfers.upsertMany(event.id, [
-      { fromUserId: 2, toUserId: 1, amountKopecks: 100_000 },
-    ]);
-    assert.equal(created!.status, 'pending');
-    assert.equal(created!.mode, 'unset');
-    assert.equal(created!.paidAt, null);
-
-    await repos.transfers.patch(created!.id, {
-      status: 'paid',
-      mode: 'transfer',
-      paidAt: '2030-05-01T00:00:00.000Z',
-      detailsSentAt: '2030-04-30T00:00:00.000Z',
-    });
-
-    const [updated] = await repos.transfers.upsertMany(event.id, [
-      { fromUserId: 2, toUserId: 1, amountKopecks: 250_000 },
-    ]);
-    assert.equal(updated!.id, created!.id);
-    assert.equal(updated!.createdAt, created!.createdAt);
-    assert.equal(updated!.amountKopecks, 250_000);
-    assert.equal(updated!.status, 'paid');
-    assert.equal(updated!.mode, 'transfer');
-    assert.equal(updated!.paidAt, '2030-05-01T00:00:00.000Z');
-    assert.equal(updated!.detailsSentAt, '2030-04-30T00:00:00.000Z');
-
-    assert.equal((await repos.transfers.findPair(event.id, 2, 1))?.id, created!.id);
-    assert.equal((await repos.transfers.findPair(event.id, 1, 2)), null);
-    assert.equal((await repos.transfers.findById(created!.id))?.amountKopecks, 250_000);
-    assert.deepEqual(await repos.transfers.upsertMany(event.id, []), []);
-    assert.equal(
-      (await repos.transfers.upsertMany(event.id, [
-        { fromUserId: 2, toUserId: 1, amountKopecks: 300_000 },
-      ])).length,
-      1,
-    );
-    assert.equal((await repos.transfers.listByEvent(event.id)).length, 1);
-  });
-
-  it('списки долгов не показывают закрытые расчёты', async () => {
-    const repos = createMemoryRepositories();
-    const event = await repos.events.create(eventInput());
-    const [first] = await repos.transfers.upsertMany(event.id, [
-      { fromUserId: 2, toUserId: 1, amountKopecks: 100_000 },
-    ]);
-    await repos.transfers.upsertMany(event.id, [{ fromUserId: 3, toUserId: 1, amountKopecks: 50_000 }]);
-
-    assert.deepEqual(
-      (await repos.transfers.listForDebtor(2)).map((transfer) => transfer.id),
-      [first!.id],
-    );
-    assert.equal((await repos.transfers.listForCreditor(1)).length, 2);
-    assert.deepEqual(await repos.transfers.listForCreditor(2), []);
-
-    await repos.transfers.patch(first!.id, { status: 'closed', closedAt: '2030-05-02T00:00:00.000Z' });
-    assert.deepEqual(await repos.transfers.listForDebtor(2), []);
-    assert.equal((await repos.transfers.listForCreditor(1)).length, 1);
-    assert.equal(
-      (await repos.transfers.patch(first!.id, {}))!.status,
-      'closed',
-    );
-  });
-
   it('ensure создаёт профиль, обновляет непустые поля и хранит дату создания', async () => {
     const repos = createMemoryRepositories();
     const created = await repos.users.ensure(5, {
@@ -657,8 +552,6 @@ describe('память: шаблоны, расчёты и профили', () =>
       name: 'Аня',
       username: 'anya',
       contact: '+7 999 000-00-00',
-      bankName: '',
-      paymentHandle: '',
     });
 
     const patched = await repos.users.ensure(5, { username: 'anya_new' });
@@ -671,16 +564,12 @@ describe('память: шаблоны, расчёты и профили', () =>
     assert.equal(empty.contact, '+7 999 000-00-00');
     assert.equal(typeof (await repos.users.createdAt(5)), 'string');
 
-    await repos.users.saveContact(5, '+7 000 000-00-00');
-    const saved = await repos.users.savePaymentDetails(5, 'Сбер', '+7 000 000-00-00');
+    const saved = await repos.users.saveContact(5, '+7 000 000-00-00');
     assert.equal(saved.contact, '+7 000 000-00-00');
-    assert.equal(saved.bankName, 'Сбер');
-    assert.equal(saved.paymentHandle, '+7 000 000-00-00');
-    assert.equal((await repos.users.find(5))?.bankName, 'Сбер');
+    assert.equal((await repos.users.find(5))?.contact, '+7 000 000-00-00');
 
-    const fresh = await repos.users.savePaymentDetails(6, 'Тинькофф', '1234');
+    const fresh = await repos.users.saveContact(6, '');
     assert.equal(fresh.name, '');
-    assert.equal(fresh.contact, '');
     assert.equal(await repos.users.createdAt(999), null);
     assert.equal(await repos.users.find(999), null);
   });
@@ -691,7 +580,7 @@ describe('память: снимок и зеркало базы', () => {
     const repos: Repositories = createMemoryRepositories();
     assert.deepEqual(
       Object.keys(repos).sort(),
-      ['events', 'items', 'participants', 'templates', 'transfers', 'users'],
+      ['events', 'items', 'participants', 'templates', 'users'],
     );
 
     const event = await repos.events.create(eventInput());
@@ -708,7 +597,6 @@ describe('память: снимок и зеркало базы', () => {
       participants: 0,
       items: 0,
       templates: 0,
-      transfers: 0,
       users: 0,
     });
     assert.equal((await repos.events.findByCode(' abc23 '))?.id, 'evt_mirror');
@@ -738,9 +626,6 @@ describe('память: снимок и зеркало базы', () => {
       ['tpl_mirror'],
     );
 
-    store.putTransfer(transferRecord({ eventId: 'evt_mirror', fromUserId: 2, toUserId: 1 }));
-    assert.equal((await repos.transfers.findPair('evt_mirror', 2, 1))?.id, 'trf_mirror');
-    assert.equal((await repos.transfers.listForDebtor(2)).length, 1);
 
     store.putUser(userProfile());
     assert.equal((await repos.users.find(5))?.name, 'Аня');
@@ -775,13 +660,6 @@ describe('память: снимок и зеркало базы', () => {
     assert.equal(store.reservations().length, 0);
     assert.equal((await repos.items.findById(item.id))?.reservation, null);
 
-    store.putTransfer(transferRecord({ eventId: 'evt_mirror', fromUserId: 2, toUserId: 1 }));
-    store.putTransfer(
-      transferRecord({ id: 'trf_two', eventId: 'evt_mirror', fromUserId: 2, toUserId: 1, amountKopecks: 700 }),
-    );
-    assert.equal(store.counts().transfers, 1);
-    assert.equal((await repos.transfers.findPair('evt_mirror', 2, 1))?.id, 'trf_two');
-    assert.equal((await repos.transfers.findPair('evt_mirror', 2, 1))?.amountKopecks, 700);
 
     store.putUser(userProfile({ name: 'Старое' }));
     store.putUser(userProfile({ name: 'Новое' }));
@@ -797,7 +675,6 @@ describe('память: снимок и зеркало базы', () => {
     const [item] = await repos.items.addMany(event.id, ['Торт']);
     await repos.items.reserve(item!.id, event.id, 7, 'Боря');
     await repos.templates.create(1, 'Пикник', [field()]);
-    await repos.transfers.upsertMany(event.id, [{ fromUserId: 2, toUserId: 1, amountKopecks: 500 }]);
     await repos.users.ensure(5, { name: 'Аня' });
 
     assert.equal(store.isEmpty(), false);
@@ -808,7 +685,6 @@ describe('память: снимок и зеркало базы', () => {
       'participants',
       'reservations',
       'templates',
-      'transfers',
       'users',
       'version',
     ]);
@@ -830,7 +706,6 @@ describe('память: снимок и зеркало базы', () => {
       'Боря',
     );
     assert.deepEqual((await restored.participants.find(event.id, 7))?.answers, { size: 'M' });
-    assert.equal((await restored.transfers.findPair(event.id, 2, 1))?.amountKopecks, 500);
     assert.deepEqual(
       (await restored.templates.listByOwner(1)).map((template) => template.name),
       ['Пикник'],
@@ -848,12 +723,11 @@ describe('память: снимок и зеркало базы', () => {
       participants: 0,
       items: 0,
       templates: 0,
-      transfers: 0,
       users: 0,
     });
   });
 
-  it('restore восстанавливает индексы: код события и пару расчёта', async () => {
+  it('restore восстанавливает индексы: код события', async () => {
     const store = new MemoryStore();
     const snapshot: MemorySnapshot = {
       version: 1,
@@ -864,7 +738,6 @@ describe('память: снимок и зеркало базы', () => {
         reservationRecord({ itemId: 'itm_mirror', eventId: 'evt_mirror', userId: 7, userName: 'Боря' }),
       ],
       templates: [templateRecord()],
-      transfers: [transferRecord({ eventId: 'evt_mirror', fromUserId: 2, toUserId: 1 })],
       users: [
         {
           ...userProfile(),
@@ -877,7 +750,6 @@ describe('память: снимок и зеркало базы', () => {
     store.restore(snapshot);
     const repos = createMemoryRepositories(store);
     assert.equal((await repos.events.findByCode('zzz99'))?.id, 'evt_mirror');
-    assert.equal((await repos.transfers.findPair('evt_mirror', 2, 1))?.id, 'trf_mirror');
     assert.equal((await repos.items.findById('itm_mirror'))?.reservation?.userName, 'Боря');
     assert.equal(await repos.users.createdAt(5), '2030-01-01T00:00:00.000Z');
     assert.equal((await repos.events.listForUser(7)).length, 1);
@@ -890,7 +762,6 @@ describe('память: снимок и зеркало базы', () => {
       items: [],
       reservations: [],
       templates: [],
-      transfers: [],
       users: [],
     });
     assert.equal(store.isEmpty(), false);

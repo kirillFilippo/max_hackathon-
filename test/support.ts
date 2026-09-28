@@ -21,7 +21,6 @@ import { ParticipantService } from '../src/services/participantService.js';
 import { ProfileService } from '../src/services/profileService.js';
 import { DebugService } from '../src/services/debugService.js';
 import { ReminderService } from '../src/services/reminderService.js';
-import { SettlementService } from '../src/services/settlementService.js';
 import { TemplateService } from '../src/services/templateService.js';
 
 export type { FakeNotifier };
@@ -80,7 +79,6 @@ export interface Harness {
   events: EventService;
   participants: ParticipantService;
   items: ItemService;
-  settlements: SettlementService;
   templates: TemplateService;
   reminders: ReminderService;
   sessionStore: PgSessionStore<BotSession>;
@@ -124,7 +122,6 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
   const events = new EventService(repos, config);
   const participants = new ParticipantService(repos);
   const items = new ItemService(repos);
-  const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, config);
   const debug = new DebugService({ events, participants, items }, config);
@@ -139,7 +136,6 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
     events,
     participants,
     items,
-    settlements,
     templates,
     reminders,
     debug,
@@ -158,14 +154,13 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
     events,
     participants,
     items,
-    settlements,
     templates,
     reminders,
     sessionStore,
     notifier,
     reset: async () => {
       await db.query(
-        'TRUNCATE transfer_requests, reservations, event_items, participants, events, templates, users, sessions CASCADE',
+        'TRUNCATE reservations, event_items, participants, events, templates, users, sessions CASCADE',
       );
       notifier.messages.length = 0;
     },

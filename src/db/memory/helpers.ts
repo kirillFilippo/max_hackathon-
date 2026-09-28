@@ -5,7 +5,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../../domain/types.js';
 import { normalizeFields } from '../../domain/questionnaire.js';
@@ -63,8 +62,6 @@ export const mapItem = (item: EventItem, reservation: Reservation | null): ItemW
         userId: reservation.userId,
         userName: reservation.userName ?? '',
         reservedAt: toIso(reservation.reservedAt ?? item.createdAt),
-        paidKopecks: toNumberOrNull(reservation.paidKopecks),
-        paidAt: toIsoOrNull(reservation.paidAt),
         note: reservation.note ?? '',
       }
     : null,
@@ -80,20 +77,9 @@ export const mapTemplate = (template: Template): Template => ({
   createdAt: toIso(template.createdAt),
 });
 
-export const mapTransfer = (transfer: TransferRequest): TransferRequest => ({
-  ...transfer,
-  amountKopecks: Number(transfer.amountKopecks),
-  notifiedAt: toIsoOrNull(transfer.notifiedAt),
-  detailsSentAt: toIsoOrNull(transfer.detailsSentAt),
-  paidAt: toIsoOrNull(transfer.paidAt),
-  closedAt: toIsoOrNull(transfer.closedAt),
-});
-
 export const mapUser = (user: StoredUserProfile): UserProfile => ({
   userId: user.userId,
   name: user.name,
   username: user.username ?? null,
   contact: user.contact,
-  bankName: user.bankName,
-  paymentHandle: user.paymentHandle,
 });

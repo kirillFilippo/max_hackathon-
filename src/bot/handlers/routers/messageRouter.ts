@@ -12,7 +12,6 @@ import { showEventList, showMainMenu } from '../features/events.js';
 import { tryAnswerFaqText } from '../features/faq.js';
 import { showFaq } from '../features/faq.js';
 import { showTemplates } from '../features/templates.js';
-import { showDuties } from '../features/money.js';
 import { showProfile } from '../features/profile.js';
 import { userIdOf, withErrorHandling } from '../helpers.js';
 
@@ -118,10 +117,6 @@ export const registerCommands = (bot: import('@maxhub/max-bot-api').Bot<BotConte
 
   bot.command('faq', wrap(deps, 'faq', async (ctx) => {
     await showFaq(ctx, deps);
-  }));
-
-  bot.command('duties', wrap(deps, 'duties', async (ctx) => {
-    await showDuties(ctx, deps);
   }));
 
   bot.command('profile', wrap(deps, 'profile', async (ctx) => {

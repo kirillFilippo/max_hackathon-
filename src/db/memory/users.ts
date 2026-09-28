@@ -6,7 +6,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../../domain/types.js';
 import type {
@@ -20,8 +19,6 @@ import type {
   ReserveResult,
   SaveParticipantInput,
   TemplatesRepository,
-  TransferPatch,
-  TransfersRepository,
   UserPatch,
   UsersRepository,
 } from '../repositories/contracts.js';
@@ -70,8 +67,6 @@ export class MemoryUsersRepository implements UsersRepository {
           name,
           username,
           contact,
-          bankName: '',
-          paymentHandle: '',
           createdAt: now,
           updatedAt: now,
         };
@@ -94,8 +89,6 @@ export class MemoryUsersRepository implements UsersRepository {
           name: '',
           username: null,
           contact,
-          bankName: '',
-          paymentHandle: '',
           createdAt: now,
           updatedAt: now,
         };
@@ -103,28 +96,6 @@ export class MemoryUsersRepository implements UsersRepository {
     return mapUser(record);
   }
 
-  async savePaymentDetails(
-    userId: number,
-    bankName: string,
-    paymentHandle: string,
-  ): Promise<UserProfile> {
-    const current = this.store.user(userId);
-    const now = nowIso();
-    const record: StoredUserProfile = current
-      ? { ...current, bankName, paymentHandle, updatedAt: now }
-      : {
-          userId,
-          name: '',
-          username: null,
-          contact: '',
-          bankName,
-          paymentHandle,
-          createdAt: now,
-          updatedAt: now,
-        };
-    this.store.putUser(record);
-    return mapUser(record);
-  }
 
   async createdAt(userId: number): Promise<string | null> {
     const user = this.store.user(userId);

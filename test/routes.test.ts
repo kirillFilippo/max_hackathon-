@@ -69,6 +69,23 @@ describe('Маршрутизация кнопок: дымовые проверк
     assert.match(info, /Вечер настолок/);
   });
 
+  it('покупки доступны из карточки сразу', async () => {
+    const created = await event();
+    harness.clearSent();
+    await harness.click(`ev:card:${created.code}`, { chatId: 1200, userId: 1200 });
+
+    const labels = harness.lastButtons(1200).map((button) => button.text);
+    assert.ok(
+      labels.includes('Добавить список покупок'),
+      `в карточке нет входа в покупки: ${labels.join(', ')}`,
+    );
+    // Расчётов в продукте нет: кнопки и экрана быть не должно.
+    assert.ok(
+      !labels.some((label) => /расчёт/i.test(label)),
+      `осталась кнопка расчётов: ${labels.join(', ')}`,
+    );
+  });
+
   it('настройка способа ответа на анкету и возврат', async () => {
     const created = await event();
     const screen = await clickOk(`q:mode:${created.code}`);
@@ -178,7 +195,5 @@ describe('Маршрутизация кнопок: дымовые проверк
     await harness.sendText('Тинькофф', { chatId: 1500, userId: 1500 });
     await harness.sendText('+7 900 000-11-22', { chatId: 1500, userId: 1500 });
     const withDetails = await harness.base.profiles.get(1500);
-    assert.equal(withDetails?.bankName, 'Тинькофф');
-    assert.equal(withDetails?.paymentHandle, '+7 900 000-11-22');
   });
 });

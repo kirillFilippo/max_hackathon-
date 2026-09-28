@@ -28,7 +28,6 @@ export const hydrateMemory = async (
       userIds.add(participant.userId);
     }
     for (const item of await pg.items.listByEvent(event.id)) store.putItem(item);
-    for (const transfer of await pg.transfers.listByEvent(event.id)) store.putTransfer(transfer);
   }
 
   for (const userId of userIds) {

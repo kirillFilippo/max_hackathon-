@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { toKopecks } from '../src/domain/money.js';
 import { startHarness, createEvent, register, hoursFromNow, type Harness } from './support.js';
 
 let harness: Harness;
@@ -172,110 +171,6 @@ describe('Список покупок и брони', () => {
 
     assert.equal(await harness.items.removeItem(afterRelease[1]!.id), true);
     assert.equal((await harness.items.list(event.id)).length, 1);
-  });
-});
-
-describe('Фактические суммы и расчёты', () => {
-  const setup = async () => {
-    const event = await createEvent(harness);
-    await harness.items.add(event.id, ['Продукты', 'Вода', 'Уголь']);
-    await register(harness, event.id, 1, 'Аня');
-    await register(harness, event.id, 2, 'Боря');
-    await register(harness, event.id, 3, 'Вика');
-    return event;
-  };
-
-  it('считает общие траты по введённым суммам и создаёт запросы на перевод', async () => {
-    const event = await setup();
-    await harness.items.reserveByNumbers(event, 1, 'Аня', [1, 2]);
-    const items = await harness.items.list(event.id);
-    await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(3000));
-    await harness.items.setPaidAmount(items[1]!.id, 1, toKopecks(600));
-    await harness.items.reserveByNumbers(event, 2, 'Боря', [3]);
-    const withBoris = await harness.items.list(event.id);
-    await harness.items.setPaidAmount(withBoris[2]!.id, 2, toKopecks(900));
-
-    const view = await harness.settlements.view(event);
-    assert.equal(view.settlement.totalKopecks, 450_000);
-    assert.equal(view.settlement.perPersonKopecks, 150_000);
-    // Должники обрабатываются от большего долга к меньшему.
-    assert.deepEqual(
-      view.settlement.transfers.map((transfer) => [transfer.fromName, transfer.toName, transfer.amountKopecks]),
-      [
-        ['Вика', 'Аня', 150_000],
-        ['Боря', 'Аня', 60_000],
-      ],
-    );
-
-    const requested = await harness.settlements.requestTransfers(event);
-    assert.equal(requested.toNotify.length, 2);
-    const stored = await harness.settlements.listByEvent(event.id);
-    assert.equal(stored.length, 2);
-    assert.ok(stored.every((request) => request.status === 'pending' && request.notifiedAt !== null));
-  });
-
-  it('передаёт реквизиты должника получателю и сохраняет их в профиле', async () => {
-    const event = await setup();
-    await harness.items.reserveByNumbers(event, 1, 'Аня', [1]);
-    const items = await harness.items.list(event.id);
-    await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(1000));
-    await harness.settlements.requestTransfers(event);
-
-    const requests = await harness.settlements.listByEvent(event.id);
-    const borisRequest = requests.find((request) => request.fromUserId === 2)!;
-
-    const applied = await harness.settlements.applyDetails(borisRequest.id, 2, 'Тинькофф', '+7 999 000-00-00');
-    assert.ok(applied);
-    assert.equal(applied.request.status, 'details_sent');
-    assert.equal(applied.request.mode, 'transfer');
-
-    const profile = await harness.profiles.get(2);
-    assert.equal(profile?.bankName, 'Тинькофф');
-    assert.equal(profile?.paymentHandle, '+7 999 000-00-00');
-  });
-
-  it('не даёт чужому участнику закрыть расчёт и ведёт статусы до закрытия', async () => {
-    const event = await setup();
-    await harness.items.reserveByNumbers(event, 1, 'Аня', [1]);
-    const items = await harness.items.list(event.id);
-    await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(600));
-    await harness.settlements.requestTransfers(event);
-
-    const request = (await harness.settlements.listByEvent(event.id))
-      .find((entry) => entry.fromUserId === 2)!;
-
-    // Чужой пользователь (не получатель) не может подтвердить получение.
-    assert.equal(await harness.settlements.markReceived(request.id, 3), null);
-
-    const inPerson = await harness.settlements.markInPerson(request.id, 2);
-    assert.equal(inPerson?.status, 'in_person');
-    assert.equal(inPerson?.mode, 'in_person');
-
-    const paid = await harness.settlements.markPaid(request.id, 2);
-    assert.equal(paid?.status, 'paid');
-
-    const received = await harness.settlements.markReceived(request.id, 1);
-    assert.equal(received?.status, 'closed');
-    assert.ok(received?.closedAt);
-
-    // Закрытая пара не переоткрывается повторным расчётом.
-    const again = await harness.settlements.requestTransfers(event);
-    assert.equal(again.alreadyClosed, 1);
-  });
-
-  it('пересчитывает сумму запроса при изменении трат', async () => {
-    const event = await setup();
-    await harness.items.reserveByNumbers(event, 1, 'Аня', [1]);
-    let items = await harness.items.list(event.id);
-    await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(300));
-    await harness.settlements.requestTransfers(event);
-
-    await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(900));
-    await harness.settlements.requestTransfers(event);
-
-    const stored = await harness.settlements.listByEvent(event.id);
-    const toBoris = stored.find((request) => request.fromUserId === 2)!;
-    assert.equal(toBoris.amountKopecks, 30_000);
   });
 });
 

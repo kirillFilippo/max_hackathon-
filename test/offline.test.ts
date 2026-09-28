@@ -178,7 +178,6 @@ describe('Синхронизация памяти с PostgreSQL', () => {
     });
     const items = await memory.items.addMany(event.id, ['Продукты', 'Вода']);
     await memory.items.reserve(items[0]!.id, event.id, 7, 'Аня');
-    await memory.items.setPaidAmount(items[0]!.id, 7, 120_050);
     await memory.users.ensure(7, { name: 'Аня', username: 'anya' });
     await memory.templates.create(42, 'Настолки', []);
 
@@ -195,7 +194,6 @@ describe('Синхронизация памяти с PostgreSQL', () => {
     const dbItems = await harness.items.list(event.id);
     assert.equal(dbItems.length, 2);
     assert.equal(dbItems[0]?.reservation?.userId, 7);
-    assert.equal(dbItems[0]?.reservation?.paidKopecks, 120_050);
 
     const templates = await harness.repos.templates.listByOwner(42);
     assert.equal(templates.length, 1);

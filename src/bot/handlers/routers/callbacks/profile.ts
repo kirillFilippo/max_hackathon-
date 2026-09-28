@@ -1,7 +1,7 @@
 import type { ParticipantStatus } from '../../../../domain/types.js';
 import { type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
-import { startContactDraft, startPaymentDraft } from '../../features/profile.js';
+import { startContactDraft } from '../../features/profile.js';
 
 
 export const handleProfile = async (
@@ -12,9 +12,6 @@ export const handleProfile = async (
 if (args[0] === 'contact') {
   await startContactDraft(ctx, deps);
   return;
-}
-if (args[0] === 'payment') {
-  await startPaymentDraft(ctx, deps);
 }
 return;
 };

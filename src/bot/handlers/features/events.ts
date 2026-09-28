@@ -31,8 +31,7 @@ export const eventViewOptions = (ctx: BotContext, deps: AppDeps): { tz: string; 
 export const showMainMenu = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
   const user = ctx.user;
   const events = user ? await deps.events.listForUser(user.user_id) : [];
-  const duties = user ? await deps.settlements.listForDebtor(user.user_id) : [];
-  await show(ctx, mainMenu({ hasEvents: events.length > 0, hasDuties: duties.length > 0 }));
+  await show(ctx, mainMenu({ hasEvents: events.length > 0 }));
 };
 
 export const showEventList = async (ctx: BotContext, deps: AppDeps): Promise<void> => {

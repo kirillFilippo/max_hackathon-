@@ -1,6 +1,5 @@
 import type { AppConfig } from '../config.js';
 import { isSyntheticUserId, syntheticUserId } from '../domain/ids.js';
-import { toKopecks } from '../domain/money.js';
 import { PRESET_TEMPLATES, fieldsFromPreset } from '../domain/presets.js';
 import type {
   DosugEvent,
@@ -190,11 +189,9 @@ export class DebugService {
     const [products, water] = items;
     if (products) {
       await this.services.items.reserveItem(event, products.id, syntheticUserId(10), 'Аня');
-      await this.services.items.setPaidAmount(products.id, syntheticUserId(10), toKopecks(1200.5));
     }
     if (water) {
       await this.services.items.reserveItem(event, water.id, syntheticUserId(11), 'Боря');
-      await this.services.items.setPaidAmount(water.id, syntheticUserId(11), toKopecks(800));
     }
 
     const [participants, freshItems] = await Promise.all([

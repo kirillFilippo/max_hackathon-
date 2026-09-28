@@ -37,11 +37,6 @@ describe('Отладочные команды', () => {
     const items = await harness.base.items.list(event.id);
     assert.equal(items.length, 4);
     assert.equal(items.filter((item) => item.reservation !== null).length, 2);
-    assert.ok(items.some((item) => (item.reservation?.paidKopecks ?? 0) > 0), 'нет сумм');
-
-    // Расчёты подготовлены: в карточке события есть что показать.
-    const transfers = await harness.base.settlements.listByEvent(event.id);
-    assert.ok(transfers.length > 0, 'нет запросов на перевод');
 
     // Организатор видит карточку события с кодом и ссылкой.
     assert.match(harness.lastText(800), new RegExp(event.code));

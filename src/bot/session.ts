@@ -4,6 +4,8 @@ import type { PlaceCoords } from '../domain/types.js';
 export type CreateEventStep =
   | 'title'
   | 'datetime'
+  /** Дата без времени: спрашиваем время отдельным шагом, а не подставляем своё. */
+  | 'time'
   | 'place'
   | 'place-confirm'
   | 'description'
@@ -16,6 +18,8 @@ export type CreateEventStep =
 export interface EventDraftData {
   title?: string;
   startsAt?: string;
+  /** Дата без времени: ждём время отдельным шагом (см. шаг `time`). */
+  pendingDate?: string;
   place?: string;
   placeCoords?: PlaceCoords | null;
   description?: string;

@@ -6,16 +6,11 @@ import {
   CB,
   cbEventCard,
   cbEventEditField,
-  cbItemPrice,
   cbItemTake,
-  cbMoneyShow,
-  cbMoneyRequest,
   cbRegAnswer,
   cbRegStatus,
   cbShopShow,
   cbTemplateRename,
-  cbTransferDetails,
-  cbTransferReceived,
   eventCodeFromStartPayload,
   parseCallback,
 } from '../src/bot/callbacks.js';
@@ -30,12 +25,10 @@ import {
   templateCard,
   templatesList,
 } from '../src/bot/texts/event.js';
-import { dutiesPanel, settlementPanel, transferCreditorCard, transferDebtorCard } from '../src/bot/texts/money.js';
 import { finalReminder } from '../src/bot/texts/registration.js';
 import { contentToExtra as toSendExtra } from '../src/bot/context.js';
 import { myItems, reserveResult, shoppingList } from '../src/bot/texts/shopping.js';
 import { createEvent, register, startHarness, type Harness } from './support.js';
-import { toKopecks } from '../src/domain/money.js';
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u;
 
@@ -55,14 +48,6 @@ describe('callback payloads', () => {
       action: 'item',
       args: ['take', 'A7K2Q', 'itm_1'],
     });
-    assert.deepEqual(parseCallback(cbItemPrice('A7K2Q', 'itm_1')), {
-      action: 'item',
-      args: ['price', 'A7K2Q', 'itm_1'],
-    });
-    assert.deepEqual(parseCallback(cbMoneyShow('A7K2Q')), { action: 'money', args: ['show', 'A7K2Q'] });
-    assert.deepEqual(parseCallback(cbMoneyRequest('A7K2Q')), { action: 'money', args: ['request', 'A7K2Q'] });
-    assert.deepEqual(parseCallback(cbTransferDetails('trf_1')), { action: 'tr', args: ['details', 'trf_1'] });
-    assert.deepEqual(parseCallback(cbTransferReceived('trf_1')), { action: 'tr', args: ['received', 'trf_1'] });
     assert.deepEqual(parseCallback(cbRegStatus('A7K2Q', 'going')), {
       action: 'reg',
       args: ['status', 'A7K2Q', 'going'],
@@ -104,10 +89,10 @@ const buttonTexts = (content: { keyboard?: Array<Array<{ text: string }>> }): st
 
 describe('Тексты бота', () => {
   it('меню и помощь без эмодзи', () => {
-    const menu = mainMenu({ hasEvents: true, hasDuties: true });
+    const menu = mainMenu({ hasEvents: true });
     assertNoEmoji(menu.text, 'главное меню');
     assertNoEmoji(helpText().text, 'помощь');
-    assert.match(menu.text, /Мои расчёты/);
+    assert.match(menu.text, /Мои события/);
   });
 
   it('карточка события содержит адрес, карту, код и ссылку', async () => {
@@ -227,68 +212,6 @@ describe('Тексты бота', () => {
     }
   });
 
-  it('панель расчётов и карточки перевода без эмодзи и с суммами', async () => {
-    {
-      const event = await createEvent(harness);
-      await harness.items.add(event.id, ['Продукты']);
-      await register(harness, event.id, 1, 'Аня');
-      await register(harness, event.id, 2, 'Боря');
-      await harness.items.reserveByNumbers(event, 1, 'Аня', [1]);
-      const items = await harness.items.list(event.id);
-      await harness.items.setPaidAmount(items[0]!.id, 1, toKopecks(2000));
-
-      const view = await harness.settlements.view(event);
-      const panel = settlementPanel(view, [], {
-        tz: 'Europe/Moscow',
-        isOrganizer: true,
-        nameOf: (userId) => (userId === 1 ? 'Аня' : 'Боря'),
-      });
-      assertNoEmoji(panel.text, 'панель расчётов');
-      assert.match(panel.text, /Общие траты: 2 000 ₽/);
-      assert.match(panel.text, /Боря → Аня: 1 000 ₽/);
-
-      await harness.settlements.requestTransfers(event);
-      const request = (await harness.settlements.listByEvent(event.id)).find((r) => r.fromUserId === 2)!;
-
-      const debtor = transferDebtorCard({
-        request,
-        event,
-        creditorName: 'Аня',
-        items: ['Продукты'],
-        profile: null,
-        tz: 'Europe/Moscow',
-      });
-      assertNoEmoji(debtor.text, 'карточка должника');
-      assert.match(debtor.text, /Вы должны: 1 000 ₽/);
-      assert.match(debtor.text, /Кому: Аня/);
-      assert.ok(buttonTexts(debtor).some((label) => label.includes('Отдам при встрече')));
-
-      const creditor = transferCreditorCard({
-        request: { ...request, status: 'details_sent' },
-        event,
-        debtorName: 'Боря',
-        debtorProfile: {
-          userId: 2,
-          name: 'Боря',
-          username: null,
-          contact: '',
-          bankName: 'Тинькофф',
-          paymentHandle: '+7 999 000-00-00',
-        },
-      });
-      assertNoEmoji(creditor.text, 'карточка получателя');
-      assert.match(creditor.text, /Боря должен вам 1 000 ₽/);
-      assert.match(creditor.text, /Тинькофф/);
-
-      const duties = dutiesPanel({
-        debts: [{ request, event, creditorName: 'Аня' }],
-        credits: [],
-      });
-      assertNoEmoji(duties.text, 'мои расчёты');
-      assert.match(duties.text, /Аня: 1 000 ₽/);
-    }
-  });
-
   it('мои позиции и панель участников читаемы без эмодзи', async () => {
     {
       const event = await createEvent(harness);
@@ -299,7 +222,7 @@ describe('Тексты бота', () => {
 
       const mine = myItems(event, await harness.items.mine(event.id, 1));
       assertNoEmoji(mine.text, 'мои позиции');
-      assert.match(mine.text, /Продукты — сумма не указана/);
+      assert.match(mine.text, /Продукты/);
 
       const panel = participantsPanel(event, await harness.participants.listByEvent(event.id), {
         tz: 'Europe/Moscow',

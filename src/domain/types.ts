@@ -108,9 +108,6 @@ export interface Reservation {
   userId: number;
   userName: string;
   reservedAt: string;
-  /** Фактически потраченная сумма, которую вводит участник после покупки. */
-  paidKopecks: number | null;
-  paidAt: string | null;
   note: string;
 }
 
@@ -153,41 +150,6 @@ export interface UserProfile {
   name: string;
   username: string | null;
   contact: string;
-  /** Банк для перевода, например «Тинькофф». */
-  bankName: string;
-  /** Номер телефона / счёт / ник для перевода. */
-  paymentHandle: string;
-}
-
-/** Как участник собирается закрыть долг. */
-export type TransferMode = 'unset' | 'transfer' | 'in_person';
-
-export type TransferStatus =
-  /** Запрос создан и отправлен должнику. */
-  | 'pending'
-  /** Должник отправил реквизиты, они переданы получателю. */
-  | 'details_sent'
-  /** Договорились отдать при встрече. */
-  | 'in_person'
-  /** Должник отметил перевод. */
-  | 'paid'
-  /** Получатель подтвердил получение. */
-  | 'closed';
-
-export interface TransferRequest {
-  id: string;
-  eventId: string;
-  fromUserId: number;
-  toUserId: number;
-  amountKopecks: number;
-  mode: TransferMode;
-  status: TransferStatus;
-  createdAt: string;
-  updatedAt: string;
-  notifiedAt: string | null;
-  detailsSentAt: string | null;
-  paidAt: string | null;
-  closedAt: string | null;
 }
 
 export interface EventStats {

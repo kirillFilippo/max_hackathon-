@@ -1,14 +1,11 @@
 import { formatDateTime } from '../../domain/datetime.js';
-import { formatRub } from '../../domain/money.js';
 import type { DosugEvent, ItemWithReservation } from '../../domain/types.js';
 import type { ReserveOutcome } from '../../services/itemService.js';
 import {
   CB,
   cbEventCard,
-  cbItemPrice,
   cbItemRelease,
   cbItemTake,
-  cbMoneyShow,
   cbShopAdd,
   cbShopMine,
   cbShopNotify,
@@ -31,17 +28,12 @@ const itemLine = (
   const reservation = item.reservation;
   if (!reservation) return `${number} ${item.title} — свободно`;
   const mine = reservation.userId === userId ? ' (вы)' : '';
-  const amount = reservation.paidKopecks === null ? '' : `, потрачено ${formatRub(reservation.paidKopecks)}`;
-  const paid = reservation.paidKopecks === null ? '' : reservation.paidAt ? ', куплено' : '';
-  return `${number} ${item.title} — ${reservation.userName}${mine}${amount}${paid}`;
+  return `${number} ${item.title} — ${reservation.userName}${mine}`;
 };
 
 const stats = (items: ItemWithReservation[]): string => {
   const taken = items.filter((item) => item.reservation !== null).length;
-  const paidTotal = items.reduce((sum, item) => sum + (item.reservation?.paidKopecks ?? 0), 0);
-  const lines = [`Позиций: ${items.length}, занято ${taken}, свободно ${items.length - taken}`];
-  if (paidTotal > 0) lines.push(`Указано сумм на ${formatRub(paidTotal)}`);
-  return lines.join('\n');
+  return `Позиций: ${items.length}, занято ${taken}, свободно ${items.length - taken}`;
 };
 
 /** Общий список покупок. Номера позиций — те же, что вводит участник. */
@@ -77,17 +69,17 @@ export const shoppingList = (
 
   const mine = items.filter((item) => item.reservation?.userId === options.userId);
   if (mine.length > 0) {
-    rows.push([cb(`Мои позиции (${mine.length}): указать суммы`, cbShopMine(event.code))]);
+    rows.push([cb(`Мои позиции (${mine.length})`, cbShopMine(event.code))]);
   }
 
   if (options.isOrganizer) {
     rows.push([cb('Добавить позиции', cbShopAdd(event.code)), cb('Разослать список', cbShopNotify(event.code))]);
   }
-  rows.push([cb('Расчёты', cbMoneyShow(event.code)), cb('К событию', cbEventCard(event.code))]);
+  rows.push([cb('К событию', cbEventCard(event.code))]);
   return withKeyboard(lines.join('\n'), rows);
 };
 
-/** Экран «мои позиции»: указать фактическую сумму или отказаться от позиции. */
+/** Экран «мои позиции»: посмотреть, что взяли, или отказаться от позиции. */
 export const myItems = (event: DosugEvent, items: ItemWithReservation[]): MessageContent => {
   const lines = [`Мои позиции: ${event.title}`, ''];
   if (items.length === 0) {
@@ -97,28 +89,16 @@ export const myItems = (event: DosugEvent, items: ItemWithReservation[]): Messag
     ]);
   }
 
-  lines.push('После покупки укажите фактически потраченную сумму — по ней бот считает общие траты.');
+  lines.push('Эти позиции закреплены за вами: остальные видят, что покупать не нужно.');
   lines.push('');
   items.forEach((item, index) => {
-    const amount = item.reservation?.paidKopecks;
-    lines.push(
-      `${index + 1}. ${item.title} — ${amount == null ? 'сумма не указана' : `потрачено ${formatRub(amount)}`}`,
-    );
+    lines.push(`${index + 1}. ${item.title}`);
   });
 
-  const rows: KeyboardRows = items.slice(0, 6).map((item) => {
-    const paid = item.reservation?.paidKopecks;
-    return [
-      cb(
-        paid == null
-          ? `Указать сумму: ${truncate(item.title, 18)}`
-          : `Изменить сумму: ${truncate(item.title, 18)}`,
-        cbItemPrice(event.code, item.id),
-      ),
-      cb(`Отказаться`, cbItemRelease(event.code, item.id)),
-    ];
-  });
-  rows.push([cb('Список покупок', cbShopShow(event.code)), cb('Расчёты', cbMoneyShow(event.code))]);
+  const rows: KeyboardRows = items.slice(0, 6).map((item) => [
+    cb(`Отказаться: ${truncate(item.title, 18)}`, cbItemRelease(event.code, item.id)),
+  ]);
+  rows.push([cb('Список покупок', cbShopShow(event.code))]);
   return withKeyboard(lines.join('\n'), rows);
 };
 
@@ -192,13 +172,13 @@ export const reserveResult = (
 
   const rows: KeyboardRows = [];
   if (outcome.reserved.length > 0) {
-    rows.push([cb('Указать суммы по моим позициям', cbShopMine(event.code))]);
+    rows.push([cb('Мои позиции', cbShopMine(event.code))]);
   }
   const free = items.filter((item) => item.reservation === null);
   if (free.length > 0) {
     rows.push([cb(`Взять ещё (свободно ${free.length})`, cbShopShow(event.code))]);
   }
-  rows.push([cb('Расчёты', cbMoneyShow(event.code)), cb('К событию', cbEventCard(event.code))]);
+  rows.push([cb('К событию', cbEventCard(event.code))]);
   return withKeyboard(lines.join('\n'), rows);
 };
 
@@ -218,7 +198,6 @@ export const listReadyNotification = (
       : `Свободно ${free.length} из ${items.length}: ${free.map((item) => item.title).join(', ')}.`,
     '',
     'Откройте список и возьмите позицию, чтобы не дублировать покупки.',
-    'После покупки укажите потраченную сумму — бот посчитает, кто кому переводит.',
   ];
   return withKeyboard(lines.join('\n'), [[cb('Список покупок', cbShopShow(event.code))]]);
 };

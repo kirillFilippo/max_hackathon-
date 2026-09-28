@@ -13,8 +13,6 @@ interface ItemRow {
   r_user_id: number | null;
   r_user_name: string | null;
   r_reserved_at: Date | null;
-  r_paid_kopecks: number | null;
-  r_paid_at: Date | null;
   r_note: string | null;
 }
 
@@ -23,8 +21,6 @@ SELECT i.id, i.event_id, i.title, i.position, i.created_at,
        r.user_id      AS r_user_id,
        r.user_name    AS r_user_name,
        r.reserved_at  AS r_reserved_at,
-       r.paid_kopecks AS r_paid_kopecks,
-       r.paid_at      AS r_paid_at,
        r.note         AS r_note
 FROM event_items i
 LEFT JOIN reservations r ON r.item_id = i.id
@@ -47,8 +43,7 @@ const mapItem = (row: ItemRow): ItemWithReservation => {
           userId: row.r_user_id,
           userName: row.r_user_name ?? '',
           reservedAt: toIso(row.r_reserved_at ?? row.created_at),
-          paidKopecks: toNumberOrNull(row.r_paid_kopecks),
-          paidAt: toIsoOrNull(row.r_paid_at),
+
           note: row.r_note ?? '',
         };
   return { ...item, reservation };
@@ -152,21 +147,6 @@ export class ItemsRepo implements ItemsRepository {
     return row.rowCount ?? 0;
   }
 
-  async setPaidAmount(
-    itemId: string,
-    userId: number,
-    paidKopecks: number | null,
-  ): Promise<ItemWithReservation | null> {
-    const row = await this.db.query(
-      `UPDATE reservations
-       SET paid_kopecks = $3, paid_at = CASE WHEN $3::bigint IS NULL THEN NULL ELSE now() END
-       WHERE item_id = $1 AND user_id = $2
-       RETURNING item_id`,
-      [itemId, userId, paidKopecks],
-    );
-    if (row.rowCount === 0) return null;
-    return this.findById(itemId);
-  }
 
   async deleteItem(itemId: string): Promise<boolean> {
     const row = await this.db.query('DELETE FROM event_items WHERE id = $1 RETURNING id', [itemId]);

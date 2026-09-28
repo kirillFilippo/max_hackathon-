@@ -7,9 +7,6 @@ import type {
   Participant,
   ParticipantStatus,
   Template,
-  TransferMode,
-  TransferRequest,
-  TransferStatus,
   UserProfile,
 } from '../../domain/types.js';
 
@@ -82,11 +79,6 @@ export interface ItemsRepository {
   reserve(itemId: string, eventId: string, userId: number, userName: string): Promise<ReserveResult>;
   release(itemId: string, userId: number): Promise<boolean>;
   releaseAllForUser(eventId: string, userId: number): Promise<number>;
-  setPaidAmount(
-    itemId: string,
-    userId: number,
-    paidKopecks: number | null,
-  ): Promise<ItemWithReservation | null>;
   deleteItem(itemId: string): Promise<boolean>;
 }
 
@@ -130,29 +122,6 @@ export interface TemplatesRepository {
   delete(id: string, ownerId: number): Promise<boolean>;
 }
 
-export interface TransferPatch {
-  amountKopecks?: number;
-  mode?: TransferMode;
-  status?: TransferStatus;
-  notifiedAt?: string | null;
-  detailsSentAt?: string | null;
-  paidAt?: string | null;
-  closedAt?: string | null;
-}
-
-export interface TransfersRepository {
-  upsertMany(
-    eventId: string,
-    transfers: Array<{ fromUserId: number; toUserId: number; amountKopecks: number }>,
-  ): Promise<TransferRequest[]>;
-  listByEvent(eventId: string): Promise<TransferRequest[]>;
-  findById(id: string): Promise<TransferRequest | null>;
-  findPair(eventId: string, fromUserId: number, toUserId: number): Promise<TransferRequest | null>;
-  listForDebtor(userId: number): Promise<TransferRequest[]>;
-  listForCreditor(userId: number): Promise<TransferRequest[]>;
-  patch(id: string, patch: TransferPatch): Promise<TransferRequest | null>;
-}
-
 export interface UserPatch {
   name?: string;
   username?: string | null;
@@ -163,7 +132,6 @@ export interface UsersRepository {
   ensure(userId: number, patch?: UserPatch): Promise<UserProfile>;
   find(userId: number): Promise<UserProfile | null>;
   saveContact(userId: number, contact: string): Promise<UserProfile>;
-  savePaymentDetails(userId: number, bankName: string, paymentHandle: string): Promise<UserProfile>;
   createdAt(userId: number): Promise<string | null>;
 }
 
@@ -174,5 +142,4 @@ export interface Repositories {
   items: ItemsRepository;
   participants: ParticipantsRepository;
   templates: TemplatesRepository;
-  transfers: TransfersRepository;
 }

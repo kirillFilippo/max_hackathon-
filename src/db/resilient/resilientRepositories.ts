@@ -1,5 +1,5 @@
 import type { Logger } from '../../logger.js';
-import type { DosugEvent, ItemWithReservation, Participant, Template, TransferRequest, UserProfile } from '../../domain/types.js';
+import type { DosugEvent, ItemWithReservation, Participant, Template, UserProfile } from '../../domain/types.js';
 import type { MemoryStore } from '../memory/store.js';
 import type { Repositories } from '../repositories/contracts.js';
 import { isConnectionError, type ConnectionMonitor } from './connectionMonitor.js';
@@ -44,9 +44,6 @@ const putItem: Mirror = (store, result) => {
 };
 const putTemplate: Mirror = (store, result) => {
   for (const item of skipEmpty(result)) store.putTemplate(item as Template);
-};
-const putTransfer: Mirror = (store, result) => {
-  for (const item of skipEmpty(result)) store.putTransfer(item as TransferRequest);
 };
 const putUser: Mirror = (store, result) => {
   for (const item of skipEmpty(result)) store.putUser(item as UserProfile);
@@ -98,15 +95,6 @@ const SPEC: Record<keyof Repositories, RepoSpec> = {
     rename: { put: putTemplate },
     updateFields: { put: putTemplate },
     delete: { replay: true },
-  },
-  transfers: {
-    upsertMany: { put: putTransfer },
-    listByEvent: { put: putTransfer },
-    findById: { put: putTransfer },
-    findPair: { put: putTransfer },
-    listForDebtor: { put: putTransfer },
-    listForCreditor: { put: putTransfer },
-    patch: { put: putTransfer },
   },
 };
 

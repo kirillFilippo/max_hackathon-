@@ -1,3 +1,4 @@
+import { formatDate } from '../../../../domain/datetime.js';
 import type { DraftState } from '../../../session.js';
 import { CB, cbDraftTemplate } from '../../../callbacks.js';
 import type { AppDeps } from '../../../deps.js';
@@ -19,6 +20,16 @@ export const promptTitle = (): MessageContent =>
 export const promptDatetime = (): MessageContent =>
   withKeyboard(
     'Шаг 2 из 6. Когда встречаемся?\n\nНапишите дату и время сообщением.',
+    cancelRow,
+  );
+
+export const promptTime = (date: Date, tz: string): MessageContent =>
+  withKeyboard(
+    [
+      `Дата: ${formatDate(date, tz)}`,
+      '',
+      'Во сколько начало? Напишите время, например «19:00» или «в 11».',
+    ].join('\n'),
     cancelRow,
   );
 

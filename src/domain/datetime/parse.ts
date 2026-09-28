@@ -162,3 +162,21 @@ export const parseLimit = (input: string): number | null | undefined => {
   const value = Number(digits[1]);
   return value > 0 ? value : null;
 };
+
+/**
+ * Разбирает только время: «19:00», «в 11», «9.30», «19». Нужен шагу мастера, где
+ * дата уже известна, а от пользователя ждут часы и минуты.
+ */
+export const parseUserTime = (input: string, options: ParseOptions = {}): { hour: number; minute: number } | null => {
+  const tz = options.tz ?? 'Europe/Moscow';
+  void tz;
+  const raw = normalizeInput(input);
+  if (!raw) return null;
+
+  const match = /^(\d{1,2})(?:[:.](\d{2}))?$/.exec(raw);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = match[2] === undefined ? 0 : Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+};

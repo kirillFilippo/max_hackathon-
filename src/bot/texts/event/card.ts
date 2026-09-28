@@ -134,14 +134,14 @@ export const organizerEventCard = (
     lines.push('', `Код события: ${event.code}`, 'Ссылку для участников можно получить кнопкой ниже.');
   }
 
-  // Пока список покупок пуст, не показываем его — чтобы не звать в пустой раздел.
+  // Вход в покупки показываем всегда: даже на пустом списке понятно, с чего начать.
+  const shopLabel = itemCount > 0 ? 'Список покупок' : 'Добавить список покупок';
+  const shopPayload = itemCount > 0 ? cbShopShow(event.code) : cbShopAdd(event.code);
   const rows: KeyboardRows = [
     [cb('Участники', cbEventPeople(event.code)), cb('Ссылка', cbEventLink(event.code))],
-    itemCount > 0
-      ? [cb('Список покупок', cbShopShow(event.code)), cb('Расчёты', `money:show:${event.code}`)]
-      : [cb('Добавить список покупок', cbShopAdd(event.code))],
+    [cb(shopLabel, shopPayload), cb('Доп. информация', cbEventInfo(event.code))],
     [cb('Изменить', cbEventEdit(event.code)), cb('Напомнить сейчас', cbEventRemind(event.code))],
-    [cb('Доп. информация', cbEventInfo(event.code)), cb('Способ ответа на анкету', cbQuestionsModeShow(event.code))],
+    [cb('Способ ответа на анкету', cbQuestionsModeShow(event.code))],
     [cb('Завершить событие', cbEventClose(event.code)), cb('Все события', CB.menuEvents)],
   ];
   return withKeyboard(lines.join('\n'), rows);

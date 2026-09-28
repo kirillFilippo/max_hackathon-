@@ -19,7 +19,6 @@ import { ParticipantService } from './services/participantService.js';
 import { ProfileService } from './services/profileService.js';
 import { DebugService } from './services/debugService.js';
 import { ReminderService } from './services/reminderService.js';
-import { SettlementService } from './services/settlementService.js';
 import { TemplateService } from './services/templateService.js';
 import { type MiniappHandle } from './miniapp/server.js';
 import type { AnswerMode } from './domain/types.js';
@@ -64,7 +63,6 @@ export const createApp = async (
   const events = new EventService(repos, config);
   const participants = new ParticipantService(repos);
   const items = new ItemService(repos);
-  const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, config);
   const debug = new DebugService({ events, participants, items }, config);
@@ -105,7 +103,6 @@ export const createApp = async (
     events,
     participants,
     items,
-    settlements,
     templates,
     reminders,
     debug,

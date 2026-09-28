@@ -8,7 +8,7 @@ import {
   showShoppingList,
   takeItem,
 } from '../../features/shopping.js';
-import { startAddItems, startItemPrice, startReserveNumbers } from '../../drafts/items.js';
+import { startAddItems, startReserveNumbers } from '../../drafts/items.js';
 
 
 export const handleShopping = async (
@@ -51,9 +51,6 @@ if (sub === 'take') {
 if (sub === 'release') {
   await releaseItem(ctx, deps, code, itemId);
   return;
-}
-if (sub === 'price') {
-  await startItemPrice(ctx, deps, code, itemId);
 }
 return;
 };

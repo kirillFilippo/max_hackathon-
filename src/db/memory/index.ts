@@ -3,7 +3,6 @@ import { MemoryEventsRepository } from './events.js';
 import { MemoryItemsRepository } from './items.js';
 import { MemoryParticipantsRepository } from './participants.js';
 import { MemoryTemplatesRepository } from './templates.js';
-import { MemoryTransfersRepository } from './transfers.js';
 import { MemoryUsersRepository } from './users.js';
 import { MemoryStore } from './store.js';
 
@@ -20,7 +19,6 @@ export {
   MemoryItemsRepository,
   MemoryParticipantsRepository,
   MemoryTemplatesRepository,
-  MemoryTransfersRepository,
   MemoryUsersRepository,
 };
 
@@ -30,5 +28,4 @@ export const createMemoryRepositories = (store: MemoryStore = new MemoryStore())
   items: new MemoryItemsRepository(store),
   participants: new MemoryParticipantsRepository(store),
   templates: new MemoryTemplatesRepository(store),
-  transfers: new MemoryTransfersRepository(store),
 });

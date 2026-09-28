@@ -4,7 +4,6 @@ import type { AppDeps } from '../../deps.js';
 import { handleEvent } from './callbacks/event.js';
 import { handleFaq } from './callbacks/faq.js';
 import { handleMenu } from './callbacks/menu.js';
-import { handleMoney, handleTransfer } from './callbacks/money.js';
 import { handleProfile } from './callbacks/profile.js';
 import { handleQuestions, handleApp } from './callbacks/questions.js';
 import { handleRegistration } from './callbacks/registration.js';
@@ -26,8 +25,6 @@ const FAMILIES: Record<string, CallbackHandler> = {
   ev: handleEvent,
   shop: handleShopping,
   item: handleItem,
-  money: handleMoney,
-  tr: handleTransfer,
   profile: handleProfile,
   tpl: handleTemplate,
   reg: handleRegistration,

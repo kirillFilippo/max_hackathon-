@@ -15,7 +15,6 @@ import { DebugService } from '../src/services/debugService.js';
 import { ParticipantService } from '../src/services/participantService.js';
 import { ProfileService } from '../src/services/profileService.js';
 import { ReminderService } from '../src/services/reminderService.js';
-import { SettlementService } from '../src/services/settlementService.js';
 import { TemplateService } from '../src/services/templateService.js';
 import { startHarness, type Harness } from './support.js';
 
@@ -181,7 +180,6 @@ export const createBotHarness = async (
   const events = new EventService(repos, base.config);
   const participants = new ParticipantService(repos);
   const items = new ItemService(repos);
-  const settlements = new SettlementService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, base.config);
   const debug = new DebugService({ events, participants, items }, base.config);
@@ -195,7 +193,6 @@ export const createBotHarness = async (
     events,
     participants,
     items,
-    settlements,
     templates,
     reminders,
     debug,

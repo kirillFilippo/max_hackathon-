@@ -18,10 +18,6 @@ export const profileCard = (
     `Имя: ${valueOrDash(profile?.name)}`,
     `Ник в MAX: ${profile?.username ? `@${profile.username}` : '—'}`,
     `Контакт: ${valueOrDash(profile?.contact)}`,
-    '',
-    'Реквизиты для переводов:',
-    `  Банк: ${valueOrDash(profile?.bankName)}`,
-    `  Номер или счёт: ${valueOrDash(profile?.paymentHandle)}`,
   ];
 
   if (participations.length > 0) {
@@ -37,8 +33,8 @@ export const profileCard = (
   );
 
   const rows: KeyboardRows = [
-    [cb('Изменить контакт', CB.profileContact), cb('Изменить реквизиты', CB.profilePayment)],
-    [cb('Мои расчёты', CB.menuDuties), cb('В меню', CB.menuMain)],
+    [cb('Изменить контакт', CB.profileContact)],
+    [cb('Мои события', CB.menuEvents), cb('В меню', CB.menuMain)],
   ];
   return withKeyboard(lines.join('\n'), rows);
 };
@@ -53,39 +49,6 @@ export const contactPrompt = (profile: UserProfile | null): MessageContent =>
       'Напишите телефон, почту или ник — организатор увидит это в списке участников.',
     ].join('\n'),
     [[cb('Отмена', CB.draftCancel)]],
-  );
-
-export const bankPrompt = (profile: UserProfile | null): MessageContent =>
-  withKeyboard(
-    [
-      'Реквизиты для переводов',
-      '',
-      profile?.bankName
-        ? `Сейчас: ${profile.bankName}, ${profile.paymentHandle}`
-        : 'Сейчас реквизиты не указаны.',
-      '',
-      'Напишите название банка: например «Тинькофф» или «Сбер».',
-    ].join('\n'),
-    [[cb('Отмена', CB.draftCancel)]],
-  );
-
-export const handlePrompt = (bankName: string): MessageContent =>
-  withKeyboard(
-    ['Банк: ' + bankName, '', 'Теперь номер телефона, счёт или ник для перевода.'].join('\n'),
-    [[cb('Отмена', CB.draftCancel)]],
-  );
-
-export const paymentSaved = (profile: UserProfile): MessageContent =>
-  withKeyboard(
-    [
-      'Реквизиты сохранены',
-      '',
-      `Банк: ${profile.bankName}`,
-      `Номер или счёт: ${profile.paymentHandle}`,
-      '',
-      'Их бот передаст тому, кому вы должны по расчётам.',
-    ].join('\n'),
-    [[cb('Профиль', CB.menuProfile), cb('В меню', CB.menuMain)]],
   );
 
 export const contactSaved = (profile: UserProfile): MessageContent =>

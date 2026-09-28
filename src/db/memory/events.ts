@@ -9,7 +9,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../../domain/types.js';
 import type {
@@ -23,8 +22,6 @@ import type {
   ReserveResult,
   SaveParticipantInput,
   TemplatesRepository,
-  TransferPatch,
-  TransfersRepository,
   UserPatch,
   UsersRepository,
 } from '../repositories/contracts.js';

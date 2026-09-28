@@ -124,14 +124,6 @@ export class ItemService {
     };
   }
 
-  /** Фактическая сумма, которую участник заплатил за позицию. */
-  async setPaidAmount(
-    itemId: string,
-    userId: number,
-    paidKopecks: number | null,
-  ): Promise<ItemWithReservation | null> {
-    return this.repos.items.setPaidAmount(itemId, userId, paidKopecks);
-  }
 
   async removeItem(itemId: string): Promise<boolean> {
     return this.repos.items.deleteItem(itemId);

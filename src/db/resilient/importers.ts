@@ -18,24 +18,14 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
   await db.transaction(async (client) => {
     for (const user of snapshot.users) {
       await client.query(
-        `INSERT INTO users (user_id, name, username, contact, bank_name, payment_handle, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, now()), now())
+        `INSERT INTO users (user_id, name, username, contact, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, now()), now())
          ON CONFLICT (user_id) DO UPDATE SET
            name           = EXCLUDED.name,
            username       = EXCLUDED.username,
            contact        = EXCLUDED.contact,
-           bank_name      = EXCLUDED.bank_name,
-           payment_handle = EXCLUDED.payment_handle,
            updated_at     = now()`,
-        [
-          user.userId,
-          user.name,
-          user.username,
-          user.contact,
-          user.bankName,
-          user.paymentHandle,
-          ts(user.createdAt),
-        ],
+        [user.userId, user.name, user.username, user.contact, ts(user.createdAt)],
       );
     }
 
@@ -143,13 +133,11 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
       if (reservation) {
         await client.query(
           `INSERT INTO reservations
-             (item_id, event_id, user_id, user_name, reserved_at, paid_kopecks, paid_at, note)
-           VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, now()), $6, $7::timestamptz, $8)
+             (item_id, event_id, user_id, user_name, reserved_at, note)
+           VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, now()), $6)
            ON CONFLICT (item_id) DO UPDATE SET
              user_id      = EXCLUDED.user_id,
              user_name    = EXCLUDED.user_name,
-             paid_kopecks = EXCLUDED.paid_kopecks,
-             paid_at      = EXCLUDED.paid_at,
              note         = EXCLUDED.note`,
           [
             item.id,
@@ -157,8 +145,6 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
             reservation.userId,
             reservation.userName,
             ts(reservation.reservedAt),
-            reservation.paidKopecks,
-            ts(reservation.paidAt),
             reservation.note,
           ],
         );
@@ -176,37 +162,5 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
       );
     }
 
-    for (const transfer of snapshot.transfers) {
-      await client.query(
-        `INSERT INTO transfer_requests
-           (id, event_id, from_user_id, to_user_id, amount_kopecks, mode, status,
-            created_at, updated_at, notified_at, details_sent_at, paid_at, closed_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()), now(),
-                 $9::timestamptz, $10::timestamptz, $11::timestamptz, $12::timestamptz)
-         ON CONFLICT (event_id, from_user_id, to_user_id) DO UPDATE SET
-           amount_kopecks  = EXCLUDED.amount_kopecks,
-           mode            = EXCLUDED.mode,
-           status          = EXCLUDED.status,
-           notified_at     = EXCLUDED.notified_at,
-           details_sent_at = EXCLUDED.details_sent_at,
-           paid_at         = EXCLUDED.paid_at,
-           closed_at       = EXCLUDED.closed_at,
-           updated_at      = now()`,
-        [
-          transfer.id,
-          transfer.eventId,
-          transfer.fromUserId,
-          transfer.toUserId,
-          transfer.amountKopecks,
-          transfer.mode,
-          transfer.status,
-          ts(transfer.createdAt),
-          ts(transfer.notifiedAt),
-          ts(transfer.detailsSentAt),
-          ts(transfer.paidAt),
-          ts(transfer.closedAt),
-        ],
-      );
-    }
   });
 };

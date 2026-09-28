@@ -2,7 +2,7 @@ import { formatDateTime } from '../../../domain/datetime.js';
 import { STATUS_LABELS } from '../../../domain/types.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
-import { bankPrompt, contactPrompt, profileCard } from '../../texts/profile.js';
+import { contactPrompt, profileCard } from '../../texts/profile.js';
 import { requireUser, userIdOf } from '../helpers.js';
 
 export const showProfile = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
@@ -31,9 +31,3 @@ export const startContactDraft = async (ctx: BotContext, deps: AppDeps): Promise
   await show(ctx, contactPrompt(profile));
 };
 
-export const startPaymentDraft = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
-  if (!ctx.session) return;
-  const profile = await deps.profiles.get(userIdOf(ctx));
-  ctx.session.draft = { kind: 'profile-payment', step: 'bank' };
-  await show(ctx, bankPrompt(profile));
-};

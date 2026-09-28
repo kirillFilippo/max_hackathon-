@@ -4,12 +4,8 @@ import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import { handleCreateEventDraft } from '../drafts/createEvent.js';
 import { handleEditEventDraft } from '../drafts/editEvent.js';
-import { handleItemPriceDraft, handleItemReserveDraft, handleItemsAddDraft } from '../drafts/items.js';
-import {
-  handlePaymentDetailsDraft,
-  handleProfileContactDraft,
-  handleProfilePaymentDraft,
-} from '../drafts/payment.js';
+import { handleItemReserveDraft, handleItemsAddDraft } from '../drafts/items.js';
+import { handleProfileContactDraft } from '../drafts/profileContact.js';
 import { handleRegisterDraft } from '../drafts/register.js';
 import { registerDraftOwnsCallback } from '../drafts/register.js';
 import {
@@ -83,14 +79,8 @@ export const handleDraft = async (ctx: BotContext, deps: AppDeps): Promise<boole
       return handleItemsAddDraft(ctx, deps, draft);
     case 'item-reserve':
       return handleItemReserveDraft(ctx, deps, draft);
-    case 'item-price':
-      return handleItemPriceDraft(ctx, deps, draft);
-    case 'payment-details':
-      return handlePaymentDetailsDraft(ctx, deps, draft);
     case 'profile-contact':
       return handleProfileContactDraft(ctx, deps, draft);
-    case 'profile-payment':
-      return handleProfilePaymentDraft(ctx, deps, draft);
     case 'rename-template':
       return handleRenameTemplateDraft(ctx, deps, draft);
     case 'edit-template':

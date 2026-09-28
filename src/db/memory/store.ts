@@ -5,7 +5,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../../domain/types.js';
 
@@ -43,7 +42,6 @@ export interface MemorySnapshot {
   items: EventItem[];
   reservations: Reservation[];
   templates: Template[];
-  transfers: TransferRequest[];
   users: StoredUserProfile[];
 }
 
@@ -54,8 +52,6 @@ const copy = <T>(value: T): T => structuredClone(value);
 const participantKey = (eventId: string, userId: number): string => `${eventId}\u0000${userId}`;
 
 /** Ключ расчёта: в БД это UNIQUE (event_id, from_user_id, to_user_id). */
-const transferPairKey = (eventId: string, fromUserId: number, toUserId: number): string =>
-  `${eventId}\u0000${fromUserId}\u0000${toUserId}`;
 
 /** Список из снимка: JSON с диска может прийти неполным. */
 const snapshotList = <T>(value: T[] | undefined): T[] => (Array.isArray(value) ? value : []);
@@ -69,8 +65,6 @@ export class MemoryStore {
   /** Бронь на позицию: ключ item_id — как первичный ключ reservations. */
   private readonly reservationByItemId = new Map<string, Reservation>();
   private readonly templateById = new Map<string, Template>();
-  private readonly transferById = new Map<string, TransferRequest>();
-  private readonly transferIdByPair = new Map<string, string>();
   private readonly userById = new Map<number, StoredUserProfile>();
 
   // --- чтение: наружу уходят только копии ---
@@ -125,19 +119,7 @@ export class MemoryStore {
     return found ? copy(found) : null;
   }
 
-  transfers(): TransferRequest[] {
-    return [...this.transferById.values()].map(copy);
-  }
 
-  transfer(id: string): TransferRequest | null {
-    const found = this.transferById.get(id);
-    return found ? copy(found) : null;
-  }
-
-  transferPair(eventId: string, fromUserId: number, toUserId: number): TransferRequest | null {
-    const id = this.transferIdByPair.get(transferPairKey(eventId, fromUserId, toUserId));
-    return id === undefined ? null : this.transfer(id);
-  }
 
   users(): StoredUserProfile[] {
     return [...this.userById.values()].map(copy);
@@ -182,23 +164,6 @@ export class MemoryStore {
   }
 
   /** Кладёт расчёт по id, поддерживая ключ пары (eventId, fromUserId, toUserId). */
-  putTransfer(transfer: TransferRequest): void {
-    const key = transferPairKey(transfer.eventId, transfer.fromUserId, transfer.toUserId);
-    const previous = this.transferById.get(transfer.id);
-    if (previous) {
-      const previousKey = transferPairKey(previous.eventId, previous.fromUserId, previous.toUserId);
-      if (previousKey !== key && this.transferIdByPair.get(previousKey) === transfer.id) {
-        this.transferIdByPair.delete(previousKey);
-      }
-    }
-    // Пара уникальна: запись с другим id на той же паре уступает место новой.
-    const pairOwnerId = this.transferIdByPair.get(key);
-    if (pairOwnerId !== undefined && pairOwnerId !== transfer.id) this.transferById.delete(pairOwnerId);
-
-    const stored = copy(transfer);
-    this.transferById.set(stored.id, stored);
-    this.transferIdByPair.set(key, stored.id);
-  }
 
   /** Кладёт профиль по userId, сохраняя даты создания и обновления. */
   putUser(profile: UserProfile & Partial<Pick<StoredUserProfile, 'createdAt' | 'updatedAt'>>): void {
@@ -210,8 +175,6 @@ export class MemoryStore {
       name: profile.name,
       username: profile.username ?? null,
       contact: profile.contact,
-      bankName: profile.bankName,
-      paymentHandle: profile.paymentHandle,
       createdAt: raw.createdAt ?? previous?.createdAt ?? now,
       updatedAt: raw.updatedAt ?? previous?.updatedAt ?? now,
     };
@@ -262,7 +225,6 @@ export class MemoryStore {
       items: this.items(),
       reservations: this.reservations(),
       templates: this.templates(),
-      transfers: this.transfers(),
       users: this.users(),
     };
   }
@@ -279,7 +241,6 @@ export class MemoryStore {
       this.putItem({ ...item, reservation: reservations.get(item.id) ?? null });
     }
     for (const template of snapshotList(snapshot.templates)) this.putTemplate(template);
-    for (const transfer of snapshotList(snapshot.transfers)) this.putTransfer(transfer);
     for (const user of snapshotList(snapshot.users)) this.putUser(user);
   }
 
@@ -290,7 +251,6 @@ export class MemoryStore {
       this.itemById.size === 0 &&
       this.reservationByItemId.size === 0 &&
       this.templateById.size === 0 &&
-      this.transferById.size === 0 &&
       this.userById.size === 0
     );
   }
@@ -301,7 +261,6 @@ export class MemoryStore {
     participants: number;
     items: number;
     templates: number;
-    transfers: number;
     users: number;
   } {
     return {
@@ -309,7 +268,6 @@ export class MemoryStore {
       participants: this.participantByKey.size,
       items: this.itemById.size,
       templates: this.templateById.size,
-      transfers: this.transferById.size,
       users: this.userById.size,
     };
   }
@@ -321,8 +279,6 @@ export class MemoryStore {
     this.itemById.clear();
     this.reservationByItemId.clear();
     this.templateById.clear();
-    this.transferById.clear();
-    this.transferIdByPair.clear();
     this.userById.clear();
   }
 }

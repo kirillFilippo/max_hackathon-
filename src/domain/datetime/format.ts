@@ -111,6 +111,16 @@ export const formatDateTime = (value: string | Date, tz: string): string => {
   return `${parts.day} ${month} ${parts.year}, ${weekday}, ${pad(parts.hour)}:${pad(parts.minute)}`;
 };
 
+/** «25 октября 2025, сб» — дата без времени: показываем на шаге выбора времени. */
+export const formatDate = (value: string | Date, tz: string): string => {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '—';
+  const parts = tzParts(date, tz);
+  const month = MONTHS_GENITIVE[parts.month - 1] ?? '';
+  const weekday = WEEKDAYS_SHORT[weekdayIndex(date, tz)] ?? '';
+  return `${parts.day} ${month} ${parts.year}, ${weekday}`;
+};
+
 /** «25.10, 19:00» */
 export const formatDateTimeShort = (value: string | Date, tz: string): string => {
   const date = typeof value === 'string' ? new Date(value) : value;

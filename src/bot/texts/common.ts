@@ -1,7 +1,7 @@
 import { CB } from '../callbacks.js';
 import { cb, withKeyboard, type MessageContent } from '../message.js';
 
-export const mainMenu = (options: { hasEvents: boolean; hasDuties: boolean }): MessageContent => {
+export const mainMenu = (options: { hasEvents: boolean }): MessageContent => {
   const lines = [
     'Ассистент организатора',
     '',
@@ -9,14 +9,10 @@ export const mainMenu = (options: { hasEvents: boolean; hasDuties: boolean }): M
       ? 'События, участники и списки покупок — в разделе «Мои события».'
       : 'Начните с создания события: бот соберёт заявки и напомнит участникам.',
   ];
-  if (options.hasDuties) {
-    lines.push('', 'У вас есть незакрытые расчёты — раздел «Мои расчёты».');
-  }
 
   return withKeyboard(lines.join('\n'), [
     [cb('Создать событие', CB.eventNew)],
-    [cb('Мои события', CB.menuEvents), cb('Мои расчёты', CB.menuDuties)],
-    [cb('Профиль и реквизиты', CB.menuProfile), cb('Помощь', CB.menuHelp)],
+    [cb('Профиль', CB.menuProfile), cb('Помощь', CB.menuHelp)],
   ]);
 };
 
@@ -27,10 +23,9 @@ export const helpText = (): MessageContent =>
       '',
       'Организатору:',
       '/new — создать событие: название, дата, адрес, лимит, вопросы участникам',
-      '/events — события, состав участников, список покупок и выгрузка',
+      '/events — события, состав участников и список покупок',
       '/templates — наборы вопросов для новых событий',
-      '/duties — расчёты: кому и сколько вы должны или должны вам',
-      '/profile — имя, контакт и реквизиты для переводов',
+      '/profile — имя и контакт для связи',
       '/faq — частые вопросы',
       '/cancel — прервать текущий шаг',
       '',

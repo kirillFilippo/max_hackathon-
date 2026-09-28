@@ -19,8 +19,6 @@ CREATE TABLE IF NOT EXISTS users (
   name           text NOT NULL DEFAULT '',
   username       text,
   contact        text NOT NULL DEFAULT '',
-  bank_name      text NOT NULL DEFAULT '',
-  payment_handle text NOT NULL DEFAULT '',
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -83,33 +81,11 @@ CREATE TABLE IF NOT EXISTS reservations (
   user_id      bigint NOT NULL,
   user_name    text NOT NULL,
   reserved_at  timestamptz NOT NULL DEFAULT now(),
-  paid_kopecks bigint,
-  paid_at      timestamptz,
   note         text NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS reservations_event_idx ON reservations (event_id);
 CREATE INDEX IF NOT EXISTS reservations_user_idx ON reservations (event_id, user_id);
-
-CREATE TABLE IF NOT EXISTS transfer_requests (
-  id              text PRIMARY KEY,
-  event_id        text NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  from_user_id    bigint NOT NULL,
-  to_user_id      bigint NOT NULL,
-  amount_kopecks  bigint NOT NULL,
-  mode            text NOT NULL DEFAULT 'unset',
-  status          text NOT NULL DEFAULT 'pending',
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
-  notified_at     timestamptz,
-  details_sent_at timestamptz,
-  paid_at         timestamptz,
-  closed_at       timestamptz,
-  UNIQUE (event_id, from_user_id, to_user_id)
-);
-
-CREATE INDEX IF NOT EXISTS transfer_requests_from_idx ON transfer_requests (from_user_id, status);
-CREATE INDEX IF NOT EXISTS transfer_requests_to_idx ON transfer_requests (to_user_id, status);
 
 CREATE TABLE IF NOT EXISTS templates (
   id         text PRIMARY KEY,
@@ -143,6 +119,25 @@ ALTER TABLE events
 ALTER TABLE events
   ADD CONSTRAINT events_answer_mode_check
   CHECK (answer_mode IN ('auto', 'chat', 'miniapp'));
+`,
+  },
+  {
+    version: '0003_drop_settlements',
+    description: 'расчёты убраны из продукта: удаляем таблицу переводов и денежные поля',
+    sql: `
+DROP TABLE IF EXISTS transfer_requests;
+
+ALTER TABLE reservations
+  DROP COLUMN IF EXISTS paid_kopecks;
+
+ALTER TABLE reservations
+  DROP COLUMN IF EXISTS paid_at;
+
+ALTER TABLE users
+  DROP COLUMN IF EXISTS bank_name;
+
+ALTER TABLE users
+  DROP COLUMN IF EXISTS payment_handle;
 `,
   },
 ];

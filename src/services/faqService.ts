@@ -2,7 +2,6 @@ import { formatDateTime, formatRelative } from '../domain/datetime.js';
 import { FAQ_ITEMS, type FaqItem } from '../domain/faq.js';
 import { goingParticipants, isGoing } from '../domain/stats.js';
 import { normalizeUserText } from '../domain/text.js';
-import { formatRub } from '../domain/money.js';
 import type {
   DosugEvent,
   EventStats,
@@ -90,12 +89,9 @@ export const answerFaq = (item: FaqItem, context: FaqContext): string => {
         : `Лимит ${event.limit} исчерпан. Бот запишет вас в лист ожидания и сообщит, если место освободится.`;
     }
     case 'money': {
-      const paid = items.filter((entry) => entry.reservation?.paidKopecks != null);
-      const total = paid.reduce((sum, entry) => sum + (entry.reservation?.paidKopecks ?? 0), 0);
-      if (total === 0) {
-        return 'Пока никто не указал суммы. Как только участники введут фактически потраченные суммы, бот посчитает, кто кому переводит.';
-      }
-      return `Общие траты: ${formatRub(total)}. Расчёт и переводы — в разделе «Расчёты» карточки события.`;
+      return 'Бот помогает собрать людей и не дублировать покупки: позиции списка бронируются, '
+        + 'каждый видит, что берёт он, а что уже взяли другие. '
+        + 'Разделение трат и переводы между участниками — в планах: сейчас бот деньги не считает.';
     }
     default:
       return item.answer;

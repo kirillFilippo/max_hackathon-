@@ -11,7 +11,6 @@ export const CB = {
   menuFaq: 'menu:faq',
   menuHelp: 'menu:help',
   menuProfile: 'menu:profile',
-  menuDuties: 'menu:duties',
 
   eventNew: 'ev:new',
   eventList: 'ev:list',
@@ -24,7 +23,6 @@ export const CB = {
   shopMine: 'shop:mine',
 
   profileContact: 'profile:contact',
-  profilePayment: 'profile:payment',
 
   draftCancel: 'draft:cancel',
   draftSkip: 'draft:skip',
@@ -61,15 +59,8 @@ export const cbShopNotify = (code: string): string => `shop:notify:${code}`;
 
 export const cbItemTake = (code: string, itemId: string): string => `item:take:${code}:${itemId}`;
 export const cbItemRelease = (code: string, itemId: string): string => `item:release:${code}:${itemId}`;
-export const cbItemPrice = (code: string, itemId: string): string => `item:price:${code}:${itemId}`;
 
-export const cbMoneyShow = (code: string): string => `money:show:${code}`;
-export const cbMoneyRequest = (code: string): string => `money:request:${code}`;
 
-export const cbTransferDetails = (requestId: string): string => `tr:details:${requestId}`;
-export const cbTransferPerson = (requestId: string): string => `tr:person:${requestId}`;
-export const cbTransferPaid = (requestId: string): string => `tr:paid:${requestId}`;
-export const cbTransferReceived = (requestId: string): string => `tr:received:${requestId}`;
 
 export const cbDraftTemplate = (templateId: string): string => `draft:template:${templateId}`;
 export const cbDraftFieldType = (type: string): string => `draft:fieldtype:${type}`;

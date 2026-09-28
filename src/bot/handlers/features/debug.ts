@@ -50,17 +50,12 @@ export const debugCreateEvent = async (ctx: BotContext, deps: AppDeps): Promise<
   const user = requireUser(ctx);
   const scenario = await deps.debug.createFilledEvent({ userId: user.user_id, name: user.name });
 
-  // Расчёты создаём сразу: организатору видно «кто кому должен» без ручных шагов.
-  const transfers = await deps.settlements.requestTransfers(scenario.event);
   await show(
     ctx,
     withKeyboard(
       [
         'Отладочное событие создано.',
         scenarioSummary(scenario),
-        transfers.toNotify.length > 0
-          ? `Расчёты: подготовлено запросов на перевод — ${transfers.toNotify.length}.`
-          : '',
         `Код события: ${scenario.event.code}.`,
       ].filter(Boolean).join('\n'),
       [[cb('Открыть карточку', `ev:card:${scenario.event.code}`)], ...menuRow],

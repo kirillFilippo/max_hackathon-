@@ -1,8 +1,10 @@
 import {
-  DEFAULT_TIME,
   formatDateTime,
   parseLimit,
   parseUserDateTime,
+  parseUserTime,
+  tzParts,
+  zonedToUtc,
 } from '../../../../domain/datetime.js';
 import { addressWarning, normalizePlace } from '../../../../domain/maps.js';
 import { questionnaireFingerprint } from '../../../../domain/questionnaire.js';
@@ -25,11 +27,27 @@ import { publish } from './publish.js';
 import {
   promptDatetime,
   promptDescription,
+  promptTime,
   promptLimit,
   promptSaveTemplate,
   promptTemplate,
   promptTitle,
 } from './prompts.js';
+
+/** Переход к выбору места: с подписью «Когда», чтобы организатор видел дату. */
+const goToPlace = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  draft: CreateEventDraft,
+  date: Date,
+): Promise<void> => {
+  draft.step = 'place';
+  const prompt = placePrompt();
+  await show(ctx, {
+    text: `Когда: ${formatDateTime(date, deps.config.appTz)}\n\n${prompt.text}`,
+    keyboard: prompt.keyboard,
+  });
+};
 
 export const handleCreateEventDraft = async (
   ctx: BotContext,
@@ -70,16 +88,56 @@ export const handleCreateEventDraft = async (
         );
         return true;
       }
+      // Время не указали — не придумываем за организатора, а спрашиваем отдельно.
+      if (!parsed.hadTime) {
+        const parts = tzParts(parsed.date, deps.config.appTz);
+        // Дату запоминаем как «полночь выбранного дня», чтобы не показывать 19:00.
+        draft.data.pendingDate = zonedToUtc(parts.year, parts.month, parts.day, 0, 0, deps.config.appTz)
+          .toISOString();
+        draft.data.startsAt = draft.data.pendingDate;
+        draft.step = 'time';
+        await show(ctx, promptTime(new Date(draft.data.pendingDate), deps.config.appTz));
+        return true;
+      }
+
       draft.data.startsAt = parsed.date.toISOString();
-      draft.step = 'place';
-      const note = parsed.hadTime
-        ? ''
-        : `\n\nВремя не указано, поставил ${DEFAULT_TIME.hour}:00. Если нужно другое, нажмите «Отмена» и создайте событие заново.`;
-      const prompt = placePrompt();
-      await show(ctx, {
-        text: `Когда: ${formatDateTime(parsed.date, deps.config.appTz)}${note}\n\n${prompt.text}`,
-        keyboard: prompt.keyboard,
-      });
+
+      await goToPlace(ctx, deps, draft, parsed.date);
+      return true;
+    }
+
+    case 'time': {
+      // «Пропустить» оставляет время не заданным — покажем это в сводке.
+      if (isCallback && args[0] === 'skip') {
+        draft.data.startsAt = undefined;
+        draft.step = 'place';
+        await show(ctx, placePrompt());
+        return true;
+      }
+
+      const time = parseUserTime(input);
+      if (!time) {
+        await show(
+          ctx,
+          withKeyboard('Не понял время. Напишите, например, «19:00» или «в 11».', cancelRow),
+        );
+        return true;
+      }
+
+      // Дату берём из черновика: на этом шаге меняем только часы и минуты.
+      const base = draft.data.pendingDate ?? new Date().toISOString();
+      const parts = tzParts(new Date(base), deps.config.appTz);
+      const at = zonedToUtc(
+        parts.year,
+        parts.month,
+        parts.day,
+        time.hour,
+        time.minute,
+        deps.config.appTz,
+      );
+      draft.data.startsAt = at.toISOString();
+      draft.data.pendingDate = undefined;
+      await goToPlace(ctx, deps, draft, at);
       return true;
     }
 

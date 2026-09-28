@@ -3,10 +3,9 @@ import { EventsRepo } from './eventsRepo.js';
 import { ItemsRepo } from './itemsRepo.js';
 import { ParticipantsRepo } from './participantsRepo.js';
 import { TemplatesRepo } from './templatesRepo.js';
-import { TransfersRepo } from './transfersRepo.js';
 import { UsersRepo } from './usersRepo.js';
 
-export { EventsRepo, ItemsRepo, ParticipantsRepo, TemplatesRepo, TransfersRepo, UsersRepo };
+export { EventsRepo, ItemsRepo, ParticipantsRepo, TemplatesRepo, UsersRepo };
 export * from './contracts.js';
 
 import type { Repositories } from './contracts.js';
@@ -22,5 +21,4 @@ export const createRepositories = (db: Db): Repositories => ({
   items: new ItemsRepo(db),
   participants: new ParticipantsRepo(db),
   templates: new TemplatesRepo(db),
-  transfers: new TransfersRepo(db),
 });

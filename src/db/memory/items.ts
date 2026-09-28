@@ -7,7 +7,6 @@ import type {
   Participant,
   Reservation,
   Template,
-  TransferRequest,
   UserProfile,
 } from '../../domain/types.js';
 import { toNumberOrNull } from '../mappers.js';
@@ -22,8 +21,6 @@ import type {
   ReserveResult,
   SaveParticipantInput,
   TemplatesRepository,
-  TransferPatch,
-  TransfersRepository,
   UserPatch,
   UsersRepository,
 } from '../repositories/contracts.js';
@@ -130,8 +127,6 @@ export class MemoryItemsRepository implements ItemsRepository {
       userId,
       userName,
       reservedAt: nowIso(),
-      paidKopecks: null,
-      paidAt: null,
       note: '',
     };
     this.store.putItem({ ...item, reservation });
@@ -149,23 +144,6 @@ export class MemoryItemsRepository implements ItemsRepository {
     return this.store.deleteReservations(eventId, userId);
   }
 
-  async setPaidAmount(
-    itemId: string,
-    userId: number,
-    paidKopecks: number | null,
-  ): Promise<ItemWithReservation | null> {
-    const existing = this.store.reservation(itemId);
-    // Чужую бронь править нельзя.
-    if (!existing || existing.userId !== userId) return null;
-
-    this.store.putReservation({
-      ...existing,
-      paidKopecks,
-      // SQL: CASE WHEN сумма IS NULL THEN NULL ELSE now() END.
-      paidAt: paidKopecks === null ? null : nowIso(),
-    });
-    return this.findById(itemId);
-  }
 
   async deleteItem(itemId: string): Promise<boolean> {
     return this.store.deleteItem(itemId);

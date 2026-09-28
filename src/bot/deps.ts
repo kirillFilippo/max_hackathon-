@@ -7,7 +7,6 @@ import type { ItemService } from '../services/itemService.js';
 import type { ParticipantService } from '../services/participantService.js';
 import type { ProfileService } from '../services/profileService.js';
 import type { ReminderService } from '../services/reminderService.js';
-import type { SettlementService } from '../services/settlementService.js';
 import type { TemplateService } from '../services/templateService.js';
 import type { PgSessionStore } from '../db/sessions.js';
 import type { AnswerMode } from '../domain/types.js';
@@ -24,7 +23,6 @@ export interface AppDeps {
   events: EventService;
   participants: ParticipantService;
   items: ItemService;
-  settlements: SettlementService;
   templates: TemplateService;
   reminders: ReminderService;
   /** Отладочные события с синтетическими людьми (команды debug*). */

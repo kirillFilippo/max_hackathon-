@@ -1,4 +1,3 @@
-import { formatRub, parsePriceKopecks } from '../../../domain/money.js';
 import { CB } from '../../callbacks.js';
 import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
@@ -94,86 +93,5 @@ export const handleItemReserveDraft = async (
     return true;
   }
   await reserveByNumbersText(ctx, deps, event, input);
-  return true;
-};
-
-/** Участник указывает фактическую сумму за свою позицию. */
-export const startItemPrice = async (
-  ctx: BotContext,
-  deps: AppDeps,
-  code: string,
-  itemId: string,
-): Promise<void> => {
-  const event = await findEventOrNotify(ctx, deps, code);
-  if (!event) return;
-  const item = await deps.items.find(itemId);
-  if (!item || item.eventId !== event.id) {
-    await show(ctx, withKeyboard('Позиция не найдена.', menuRow));
-    return;
-  }
-  if (item.reservation?.userId !== userIdOf(ctx)) {
-    await show(ctx, withKeyboard('Эта позиция забронирована другим участником.', menuRow));
-    return;
-  }
-  if (!ctx.session) return;
-  ctx.session.draft = {
-    kind: 'item-price',
-    step: 'amount',
-    itemId,
-    eventCode: event.code,
-    itemTitle: item.title,
-  };
-  await show(ctx, itemPricePrompt(item));
-};
-
-export const handleItemPriceDraft = async (
-  ctx: BotContext,
-  deps: AppDeps,
-  draft: ItemPriceDraft,
-): Promise<boolean> => {
-  const event = await findEventOrNotify(ctx, deps, draft.eventCode);
-  if (!event) {
-    if (ctx.session) ctx.session.draft = null;
-    return true;
-  }
-  const input = userText(ctx);
-  if (!input) {
-    const item = await deps.items.find(draft.itemId);
-    if (item) await show(ctx, itemPricePrompt(item));
-    return true;
-  }
-
-  const parsed = parsePriceKopecks(input);
-  if (parsed === undefined) {
-    await show(ctx, withKeyboard('Не понял сумму. Напишите число, 0 — отказаться от позиции.', [
-      [cb('Отмена', CB.draftCancel)],
-    ]));
-    return true;
-  }
-
-  if (ctx.session) ctx.session.draft = null;
-
-  if (parsed === null) {
-    await deps.items.release(draft.itemId, userIdOf(ctx));
-    const items = await deps.items.mine(event.id, userIdOf(ctx));
-    await show(ctx, myItems(event, items));
-    return true;
-  }
-
-  const updated = await deps.items.setPaidAmount(draft.itemId, userIdOf(ctx), parsed);
-  const items = await deps.items.mine(event.id, userIdOf(ctx));
-  await show(ctx, myItems(event, items));
-  if (updated) {
-    const view = await deps.settlements.view(event);
-    const hint = view.settlement.totalKopecks > 0
-      ? `Общие траты: ${formatRub(view.settlement.totalKopecks)} на ${view.settlement.participantsCount} участников.`
-      : '';
-    if (hint) {
-      await show(
-        ctx,
-        withKeyboard(hint, [[cb('Расчёты', `money:show:${event.code}`)]]),
-      );
-    }
-  }
   return true;
 };

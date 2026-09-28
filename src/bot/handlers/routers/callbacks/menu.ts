@@ -4,7 +4,6 @@ import type { AppDeps } from '../../../deps.js';
 import { helpText } from '../../../texts/common.js';
 import { showFaq } from '../../features/faq.js';
 import { showEventList, showMainMenu } from '../../features/events.js';
-import { showDuties } from '../../features/money.js';
 import { showProfile } from '../../features/profile.js';
 import { showTemplates } from '../../features/templates.js';
 
@@ -29,9 +28,6 @@ switch (args[0]) {
     return;
   case 'profile':
     await showProfile(ctx, deps);
-    return;
-  case 'duties':
-    await showDuties(ctx, deps);
     return;
   default:
     await showMainMenu(ctx, deps);

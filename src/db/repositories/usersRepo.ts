@@ -8,8 +8,6 @@ interface UserRow {
   name: string;
   username: string | null;
   contact: string;
-  bank_name: string;
-  payment_handle: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,8 +17,6 @@ const mapUser = (row: UserRow): UserProfile => ({
   name: row.name,
   username: row.username,
   contact: row.contact,
-  bankName: row.bank_name,
-  paymentHandle: row.payment_handle,
 });
 
 /**
@@ -60,22 +56,6 @@ export class UsersRepo implements UsersRepository {
     return mapUser(row.rows[0]!);
   }
 
-  async savePaymentDetails(
-    userId: number,
-    bankName: string,
-    paymentHandle: string,
-  ): Promise<UserProfile> {
-    const row = await this.db.query<UserRow>(
-      `INSERT INTO users (user_id, bank_name, payment_handle) VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) DO UPDATE SET
-         bank_name = EXCLUDED.bank_name,
-         payment_handle = EXCLUDED.payment_handle,
-         updated_at = now()
-       RETURNING *`,
-      [userId, bankName, paymentHandle],
-    );
-    return mapUser(row.rows[0]!);
-  }
 
   async createdAt(userId: number): Promise<string | null> {
     const row = await this.db.query<{ created_at: Date }>(
