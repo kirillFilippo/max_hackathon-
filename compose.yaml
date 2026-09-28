@@ -38,10 +38,20 @@ services:
       - path: .env
         required: false
     environment:
-      # Токен бота: можно передать переменной окружения
-      # (BOT_TOKEN=<токен> docker compose up --build) или положить в .env —
-      # compose подставит его сам, отдельный файл не обязателен.
+      # Всё нужное можно передать переменными окружения, без файла .env:
+      #   BOT_TOKEN=<токен> docker compose up --build
+      # Если .env есть, compose подставит значения оттуда (env_file ниже).
       BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_MODE: ${BOT_MODE:-polling}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      WEBHOOK_PORT: ${WEBHOOK_PORT:-8080}
+      MINIAPP_URL: ${MINIAPP_URL:-}
+      MINIAPP_PORT: ${MINIAPP_PORT:-8090}
+      APP_TZ: ${APP_TZ:-Europe/Moscow}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      STORAGE_MODE: ${STORAGE_MODE:-auto}
+      DEBUG_COMMANDS: ${DEBUG_COMMANDS:-0}
       # Внутри compose база доступна по имени сервиса.
       DATABASE_URL: postgres://${POSTGRES_USER:-dosug}:${POSTGRES_PASSWORD:-dosug}@postgres:5432/${POSTGRES_DB:-dosug}
     # DNS внутри контейнера: публичные резолверы из домашней сети периодически
@@ -55,12 +65,14 @@ services:
       # пересоздание контейнера и уезжает в PostgreSQL после восстановления связи.
       - offline:/app/data
     ports:
+      # Порт на хосте задаётся отдельно (WEBHOOK_HOST_PORT): WEBHOOK_PORT — это
+      # порт внутри контейнера, и подменять его в маппинге нельзя.
       # Нужен только для BOT_MODE=webhook (long polling портов не требует).
-      - "${WEBHOOK_PORT:-8080}:8080"
+      - "${WEBHOOK_HOST_PORT:-8080}:${WEBHOOK_PORT:-8080}"
       # Мини-приложение: конструктор вопросов и анкета участника.
       # Работает, если задан MINIAPP_URL (публичный HTTPS), и этот же адрес
       # указан в настройках бота на business.max.ru.
-      - "${MINIAPP_PORT:-8090}:8090"
+      - "${MINIAPP_HOST_PORT:-8090}:${MINIAPP_PORT:-8090}"
     restart: unless-stopped
 
 volumes:
