@@ -141,6 +141,8 @@ export const reserveResult = (
   event: DosugEvent,
   outcome: ReserveOutcome,
   items: ItemWithReservation[],
+  /** Кто смотрит: нужен, чтобы отметить свои позиции «(вы)». */
+  userId = 0,
 ): MessageContent => {
   const lines: string[] = [`Список покупок: ${event.title}`, ''];
 
@@ -167,7 +169,7 @@ export const reserveResult = (
     lines.push('В списке пока нет позиций.');
   } else {
     lines.push('Текущий список:');
-    items.forEach((item, index) => lines.push(itemLine(item, index, 0)));
+    items.forEach((item, index) => lines.push(itemLine(item, index, userId)));
   }
 
   const rows: KeyboardRows = [];

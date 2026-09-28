@@ -112,3 +112,21 @@ export const sendToUser = async (
     return false;
   }
 };
+
+/**
+ * Имя участника для списка покупок.
+ *
+ * Раньше в бронь попадало имя из профиля MAX, и в списке человек мог оказаться
+ * под другим именем, чем в «Участниках» (где видно имя из заявки). Теперь берём
+ * имя заявки, а профиль MAX — только как запасной вариант.
+ */
+export const participantNameFor = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  eventId: string,
+): Promise<string> => {
+  const user = requireUser(ctx);
+  const participant = await deps.participants.find(eventId, user.user_id);
+  const fromDraft = participant?.name?.trim();
+  return fromDraft && fromDraft.length > 0 ? fromDraft : user.name;
+};

@@ -98,4 +98,9 @@ export interface BotSession {
   draft?: DraftState | null;
   /** Последнее событие пользователя — контекст для FAQ. */
   lastEventCode?: string | null;
+  /**
+   * Событие, список покупок которого пользователь видел последним. Нужен, чтобы
+   * «2 3» текстом бронировало позиции, как и обещает подсказка в списке.
+   */
+  lastShopEventCode?: string | null;
 }

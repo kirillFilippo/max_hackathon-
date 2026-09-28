@@ -11,6 +11,7 @@ import { debugCreateEvent, debugReceiveEvent, DEBUG_CREATE_COMMAND, DEBUG_RECEIV
 import { showEventList, showMainMenu } from '../features/events.js';
 import { tryAnswerFaqText } from '../features/faq.js';
 import { showFaq } from '../features/faq.js';
+import { reserveByNumbersText } from '../features/shopping.js';
 import { showTemplates } from '../features/templates.js';
 import { showProfile } from '../features/profile.js';
 import { userIdOf, withErrorHandling } from '../helpers.js';
@@ -75,6 +76,20 @@ export const handleMessage = async (ctx: BotContext, deps: AppDeps): Promise<voi
     if (event) {
       await startRegistration(ctx, deps, code);
       return;
+    }
+  }
+
+  // Номера позиций текстом: в списке покупок написано, что можно отправить «1 3 5»,
+  // поэтому понимаем такой ввод и без кнопки — но только если список открывали и
+  // никакой мастер сейчас не активен (мастера перехватываются раньше).
+  if (/^\d[\d\s,.;\-–—]*$/.test(input)) {
+    const shopCode = ctx.session?.lastShopEventCode ?? null;
+    if (shopCode) {
+      const event = await deps.events.findByCode(shopCode);
+      if (event && event.status !== 'closed') {
+        await reserveByNumbersText(ctx, deps, event, input);
+        return;
+      }
     }
   }
 

@@ -5,7 +5,19 @@ import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
 import { listReadyNotification, myItems, reserveResult, shoppingList } from '../../texts/shopping.js';
-import { findEventOrNotify, menuRow, notifyParticipants, requireUser, userIdOf } from '../helpers.js';
+import {
+  findEventOrNotify,
+  menuRow,
+  notifyParticipants,
+  participantNameFor,
+  requireUser,
+  userIdOf,
+} from '../helpers.js';
+
+/** Помнит, что пользователь смотрел список покупок: контекст для ввода номеров текстом. */
+const rememberShop = (ctx: BotContext, code: string): void => {
+  if (ctx.session) ctx.session.lastShopEventCode = code;
+};
 
 export const showShoppingList = async (
   ctx: BotContext,
@@ -14,6 +26,7 @@ export const showShoppingList = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
+  rememberShop(ctx, event.code);
   const items = await deps.items.list(event.id);
   await show(
     ctx,
@@ -28,6 +41,7 @@ export const showMyItems = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
+  rememberShop(ctx, event.code);
   const items = await deps.items.mine(event.id, userIdOf(ctx));
   await show(ctx, myItems(event, items));
 };
@@ -41,8 +55,10 @@ export const takeItem = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
+  rememberShop(ctx, event.code);
   const user = requireUser(ctx);
-  const result = await deps.items.reserveItem(event, itemId, user.user_id, user.name);
+  const name = await participantNameFor(ctx, deps, event.id);
+  const result = await deps.items.reserveItem(event, itemId, user.user_id, name);
   const items = await deps.items.list(event.id);
 
   const outcome = {
@@ -54,7 +70,7 @@ export const takeItem = async (
     unknown: [],
     free: items.filter((item) => item.reservation === null),
   };
-  await show(ctx, reserveResult(event, outcome, items));
+  await show(ctx, reserveResult(event, outcome, items, userIdOf(ctx)));
 };
 
 export const releaseItem = async (
@@ -84,9 +100,10 @@ export const reserveByNumbersText = async (
     return;
   }
   const user = requireUser(ctx);
-  const outcome = await deps.items.reserveByNumbers(event, user.user_id, user.name, numbers);
+  const name = await participantNameFor(ctx, deps, event.id);
+  const outcome = await deps.items.reserveByNumbers(event, user.user_id, name, numbers);
   const items = await deps.items.list(event.id);
-  await show(ctx, reserveResult(event, outcome, items));
+  await show(ctx, reserveResult(event, outcome, items, userIdOf(ctx)));
 };
 
 /** Рассылка участникам: список покупок объявлен. */
