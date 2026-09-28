@@ -214,6 +214,18 @@ export const handleCreateEventDraft = async (
         return true;
       }
       if (!input) {
+        // Вложение есть, а координат бот не увидел: говорим об этом прямо. Иначе
+        // экран молча перерисовывается и это выглядит как «кнопка не работает».
+        if ((ctx.message?.body?.attachments?.length ?? 0) > 0) {
+          await show(
+            ctx,
+            withKeyboard(
+              'Не разобрал геопозицию. Отправьте точку ещё раз или напишите адрес текстом.',
+              [[cb('Отмена', CB.draftCancel)]],
+            ),
+          );
+          return true;
+        }
         await show(ctx, placePrompt());
         return true;
       }

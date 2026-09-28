@@ -33,6 +33,7 @@ import { formatDateTime } from './domain/datetime.js';
 import { STATUS_LABELS } from './domain/types.js';
 import { registrationNotice } from './bot/texts/registration.js';
 import { applyMiniappFields, readDraftQuestionnaire } from './bot/handlers/miniappSync.js';
+import { fetchBotInfo, publishCommands } from './bot/botInfo.js';
 import { createMiniappTicketStore } from './bot/miniappTickets.js';
 import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
 
@@ -102,6 +103,8 @@ export const createApp = async (
     : null;
   /** Собственный сервер вебхука — включается, только если мини-приложение выключено. */
   let ownWebhookServer: Server | null = null;
+  /** Повтор знакомства с ботом, если MAX не ответил при старте. */
+  let botInfoTimer: NodeJS.Timeout | null = null;
 
   const deps: AppDeps = {
     config,
@@ -236,20 +239,27 @@ export const createApp = async (
     logger.info(`Сертификаты: ${inspectCaCert().note}`);
     logger.info(`База данных: ${config.databaseUrl.replace(/:[^:@/]+@/, ':***@')}`);
 
-    let botInfo;
-    try {
-      botInfo = await bot.api.getMyInfo();
-    } catch (error) {
-      if (isCertificateError(error)) logger.error(certificateHint());
-      throw error;
-    }
-    bot.botInfo = botInfo;
-    logger.info(`Бот @${botInfo.username ?? 'unknown'} (id ${botInfo.user_id}), режим ${config.botMode}`);
-
-    try {
-      await bot.api.setMyCommands(BOT_COMMANDS);
-    } catch (error) {
-      logger.warn('Не удалось опубликовать подсказки команд, это не критично', error);
+    // Знакомство с ботом не должно мешать запуску: при обрыве связи или DNS
+    // MAX может не ответить, и раньше это оставляло бота без подписки на вебхук.
+    const botInfo = await fetchBotInfo(bot.api, logger);
+    if (botInfo) {
+      bot.botInfo = botInfo;
+      logger.info(`Бот @${botInfo.username ?? 'unknown'} (id ${botInfo.user_id}), режим ${config.botMode}`);
+      await publishCommands(bot.api, BOT_COMMANDS, logger);
+    } else {
+      // Имя бота нужно для ссылок-приглашений: повторяем попытку в фоне.
+      botInfoTimer = setInterval(() => {
+        void (async () => {
+          const retry = await fetchBotInfo(bot.api, logger);
+          if (!retry) return;
+          bot.botInfo = retry;
+          if (botInfoTimer) clearInterval(botInfoTimer);
+          botInfoTimer = null;
+          logger.info(`Данные бота получены: @${retry.username ?? 'unknown'}`);
+          await publishCommands(bot.api, BOT_COMMANDS, logger);
+        })();
+      }, config.webhookCheckSeconds * 1000);
+      botInfoTimer.unref?.();
     }
 
     if (config.botMode === 'webhook' && webhookUrl && webhookHandler) {
@@ -268,10 +278,14 @@ export const createApp = async (
         secret: config.webhookSecret,
       });
       if (state === 'failed') {
-        // Связи нет — контейнер перезапустится (runit/compose) и попробует снова.
-        throw new Error(`Не удалось подписаться на вебхук ${subscriptionUrl}`);
+        // Связи нет прямо сейчас: не выходим, иначе бот останется без доставки
+        // до ручного перезапуска. Сторож оформит подписку, как только сеть вернётся.
+        logger.warn(
+          `Не удалось подписаться на ${subscriptionUrl} — повторю при восстановлении связи`,
+        );
+      } else {
+        logger.info(`Подписка на ${subscriptionUrl} активна`);
       }
-      logger.info(`Подписка на ${subscriptionUrl} активна`);
 
       if (miniapp) {
         logger.info(`Webhook обслуживает сервер мини-приложения на порту ${miniapp.port}`);
@@ -322,6 +336,10 @@ export const createApp = async (
     }
     webhookWatchdog?.stop();
     webhookWatchdog = null;
+    if (botInfoTimer) {
+      clearInterval(botInfoTimer);
+      botInfoTimer = null;
+    }
     bot.stopPolling();
     try {
       await bot.stopWebhook();

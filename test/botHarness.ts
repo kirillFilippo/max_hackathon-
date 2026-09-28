@@ -44,6 +44,15 @@ export interface BotHarness extends Harness {
     userId?: number;
     mid?: string;
     rapid?: boolean;
+    /** Вложения сообщения (например, геопозиция или контакт). */
+    attachments?: unknown[];
+  }): Promise<void>;
+  /** Сообщение с геопозицией — так MAX присылает ответ на кнопку «Отправить геопозицию». */
+  sendLocation(latitude: number, longitude: number, options?: {
+    chatId?: number;
+    userId?: number;
+    mid?: string;
+    rapid?: boolean;
   }): Promise<void>;
   /** Нажатие inline-кнопки. */
   click(payload: string, options?: {
@@ -217,6 +226,7 @@ export const createBotHarness = async (
     userId: number,
     text: string,
     mid: string,
+    attachments: unknown[] = [],
   ): Record<string, unknown> => ({
     update_type: 'message_created',
     timestamp: Date.now(),
@@ -224,7 +234,7 @@ export const createBotHarness = async (
       sender: user(userId),
       recipient: { chat_id: chatId, chat_type: 'dialog', user_id: userId, post_id: null },
       timestamp: Date.now(),
-      body: { mid, seq: 1, text, attachments: [] },
+      body: { mid, seq: 1, text, attachments },
     },
   });
 
@@ -282,7 +292,15 @@ export const createBotHarness = async (
     async sendText(text, options = {}) {
       const chatId = options.chatId ?? 500;
       const userId = options.userId ?? chatId;
-      await handleUpdate(messageUpdate(chatId, userId, text, options.mid ?? nextMid()));
+      await handleUpdate(messageUpdate(chatId, userId, text, options.mid ?? nextMid(), options.attachments));
+      if (!options.rapid) await delay(PACE_MS);
+    },
+    async sendLocation(latitude, longitude, options = {}) {
+      const chatId = options.chatId ?? 500;
+      const userId = options.userId ?? chatId;
+      await handleUpdate(messageUpdate(chatId, userId, '', options.mid ?? nextMid(), [
+        { type: 'location', latitude, longitude },
+      ]));
       if (!options.rapid) await delay(PACE_MS);
     },
     async click(payload, options = {}) {

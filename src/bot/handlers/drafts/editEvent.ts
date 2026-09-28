@@ -134,6 +134,16 @@ export const handleEditEventDraft = async (
   }
 
   if (!input) {
+    if (draft.fieldName === 'place' && (ctx.message?.body?.attachments?.length ?? 0) > 0) {
+      await show(
+        ctx,
+        withKeyboard(
+          'Не разобрал геопозицию. Отправьте точку ещё раз или напишите адрес текстом.',
+          cancelRow,
+        ),
+      );
+      return true;
+    }
     await show(
       ctx,
       draft.fieldName === 'place'
