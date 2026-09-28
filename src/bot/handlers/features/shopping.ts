@@ -43,7 +43,6 @@ export const showMyItems = async (
   if (!event) return;
   rememberShop(ctx, event.code);
   const items = await deps.items.mine(event.id, userIdOf(ctx));
-  deps.logger.info(`[shop] пользователь ${userIdOf(ctx)} освободил позицию ${itemId} в «${event.code}»`);
   await show(ctx, myItems(event, items));
 };
 
@@ -91,7 +90,11 @@ export const releaseItem = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
-  await deps.items.release(itemId, userIdOf(ctx));
+  const released = await deps.items.release(itemId, userIdOf(ctx));
+  deps.logger.info(
+    `[shop] пользователь ${userIdOf(ctx)} в «${event.code}» `
+    + (released ? `освободил позицию ${itemId}` : `не смог освободить позицию ${itemId}: она не его`),
+  );
   const items = await deps.items.mine(event.id, userIdOf(ctx));
   await show(ctx, myItems(event, items));
 };
