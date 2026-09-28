@@ -84,46 +84,20 @@ export const handleCreateEventDraft = async (
     }
 
     case 'place': {
-      const location = ctx.location;
-      if (location) {
-        const coords = { lat: location.latitude, lon: location.longitude };
-        draft.data.placeCoords = coords;
-        draft.data.place = draft.data.place ?? `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
-        draft.step = 'place-confirm';
-        await show(ctx, placeConfirm(draft.data.place, coords, null));
-        return true;
-      }
+      // Адрес вводится только текстом: кнопку геопозиции убрали, чтобы мастер
+      // не зависел от того, сумеет ли клиент прислать точку.
       if (!input) {
-        // Вложение есть, а координат бот не увидел: говорим об этом прямо. Иначе
-        // экран молча перерисовывается и это выглядит как «кнопка не работает».
-        if ((ctx.message?.body?.attachments?.length ?? 0) > 0) {
-          await show(
-            ctx,
-            withKeyboard(
-              'Не разобрал геопозицию. Отправьте точку ещё раз или напишите адрес текстом.',
-              [[cb('Отмена', CB.draftCancel)]],
-            ),
-          );
-          return true;
-        }
         await show(ctx, placePrompt());
         return true;
       }
       draft.data.place = normalizePlace(input);
-      draft.data.placeCoords = draft.data.placeCoords ?? null;
+      draft.data.placeCoords = null;
       draft.step = 'place-confirm';
-      await show(ctx, placeConfirm(draft.data.place, draft.data.placeCoords ?? null, addressWarning(draft.data.place)));
+      await show(ctx, placeConfirm(draft.data.place, null, addressWarning(draft.data.place)));
       return true;
     }
 
     case 'place-confirm': {
-      const location = ctx.location;
-      if (location) {
-        const coords = { lat: location.latitude, lon: location.longitude };
-        draft.data.placeCoords = coords;
-        await show(ctx, placeConfirm(draft.data.place ?? `${coords.lat}, ${coords.lon}`, coords, null));
-        return true;
-      }
       if (isCallback && action === 'draft' && args[0] === 'place' && args[1] === 'retry') {
         draft.data.place = undefined;
         draft.data.placeCoords = null;

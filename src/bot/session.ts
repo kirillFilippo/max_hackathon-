@@ -82,8 +82,7 @@ export type DraftState =
     fieldName: EditField;
     fieldType: FieldType;
     pendingPlace?: string;
-    pendingCoords?: PlaceCoords | null;
-  }
+    }
   | { kind: 'items-add'; step: 'titles'; eventId: string; eventCode: string }
   | { kind: 'item-reserve'; step: 'numbers'; eventId: string; eventCode: string }
   | { kind: 'item-price'; step: 'amount'; itemId: string; eventCode: string; itemTitle: string }

@@ -99,14 +99,6 @@ export const handleEditEventDraft = async (
   };
 
   if (draft.step === 'place-confirm') {
-    const location = ctx.location;
-    if (location) {
-      const coords = { lat: location.latitude, lon: location.longitude };
-      draft.pendingCoords = coords;
-      draft.pendingPlace = draft.pendingPlace ?? event.place;
-      await show(ctx, placeConfirm(draft.pendingPlace, coords, null));
-      return true;
-    }
     if (isCallback && action === 'draft' && args[0] === 'place' && args[1] === 'retry') {
       draft.step = 'value';
       await show(ctx, placePrompt());
@@ -115,35 +107,15 @@ export const handleEditEventDraft = async (
     if (isCallback && action === 'draft' && args[0] === 'place' && args[1] === 'ok') {
       await applyEdit({
         place: draft.pendingPlace ?? event.place,
-        placeCoords: draft.pendingCoords ?? null,
+        placeCoords: null,
       });
       return true;
     }
-    await show(ctx, placeConfirm(draft.pendingPlace ?? event.place, draft.pendingCoords ?? null, null));
-    return true;
-  }
-
-  const location = ctx.location;
-  if (location && draft.fieldName === 'place') {
-    const coords = { lat: location.latitude, lon: location.longitude };
-    draft.pendingCoords = coords;
-    draft.pendingPlace = event.place || `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
-    draft.step = 'place-confirm';
-    await show(ctx, placeConfirm(draft.pendingPlace, coords, null));
+    await show(ctx, placeConfirm(draft.pendingPlace ?? event.place, null, null));
     return true;
   }
 
   if (!input) {
-    if (draft.fieldName === 'place' && (ctx.message?.body?.attachments?.length ?? 0) > 0) {
-      await show(
-        ctx,
-        withKeyboard(
-          'Не разобрал геопозицию. Отправьте точку ещё раз или напишите адрес текстом.',
-          cancelRow,
-        ),
-      );
-      return true;
-    }
     await show(
       ctx,
       draft.fieldName === 'place'
@@ -174,7 +146,6 @@ export const handleEditEventDraft = async (
     }
     case 'place': {
       draft.pendingPlace = normalizePlace(input);
-      draft.pendingCoords = null;
       draft.step = 'place-confirm';
       await show(ctx, placeConfirm(draft.pendingPlace, null, addressWarning(draft.pendingPlace)));
       return true;

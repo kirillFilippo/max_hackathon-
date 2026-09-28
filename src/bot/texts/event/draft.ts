@@ -13,7 +13,6 @@ import type {
 } from '../../../domain/types.js';
 import { CB } from '../../callbacks.js';
 import {
-  button,
   cb,
   escapeMarkdown,
   mapLink,
@@ -32,13 +31,10 @@ export const placePrompt = (): MessageContent =>
     [
       'Шаг 3 из 6. Где встречаемся?',
       '',
-      'Напишите адрес или отправьте геопозицию кнопкой ниже.',
+      'Напишите адрес: улица, дом, ориентир или название места.',
       'Бот покажет точку на Яндекс.Картах и попросит подтвердить адрес.',
     ].join('\n'),
-    [
-      [button.requestGeoLocation('Отправить геопозицию')],
-      [cb('Отмена', CB.draftCancel)],
-    ],
+    [[cb('Отмена', CB.draftCancel)]],
   );
 
 /** Экран подтверждения адреса: адрес-ссылка на карту и замечание, если ввод похож не на адрес. */
@@ -54,7 +50,7 @@ export const placeConfirm = (
   const rows: KeyboardRows = [
     [cb('Адрес верный', CB.draftPlaceOk)],
     [cb('Ввести заново', CB.draftPlaceRetry)],
-    [button.requestGeoLocation('Уточнить геопозицией'), cb('Отмена', CB.draftCancel)],
+    [cb('Отмена', CB.draftCancel)],
   ];
   return withMarkdownKeyboard(lines.join('\n'), rows);
 };
