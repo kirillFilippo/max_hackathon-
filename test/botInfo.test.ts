@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Api } from '@maxhub/max-bot-api';
 
-import { fetchBotInfo, publishCommands } from '../src/bot/botInfo.js';
+import { botInfoPlaceholder, fetchBotInfo, publishCommands } from '../src/bot/botInfo.js';
 import type { Logger } from '../src/logger.js';
 
 /** Логгер-перехватчик: проверяем, что о проблеме честно пишут в лог. */
@@ -64,5 +64,20 @@ describe('Знакомство с ботом не зависит от досту
       logger,
     );
     assert.ok(lines.some((line) => line.level === 'warn'));
+  });
+});
+
+describe('Заглушка данных бота', () => {
+  it('выглядит как пользователь MAX: SDK читает её в логах long polling', () => {
+    const stub = botInfoPlaceholder('dosug_test_bot');
+    assert.equal(typeof stub.username, 'string');
+    assert.equal(stub.username, 'dosug_test_bot');
+    assert.equal(stub.is_bot, true);
+    assert.equal(typeof stub.user_id, 'number');
+    assert.equal(stub.user_id, 0, 'нулевой id — признак «данные ещё не получены»');
+  });
+
+  it('без известного ника подставляет безопасное значение', () => {
+    assert.equal(botInfoPlaceholder().username, 'bot');
   });
 });

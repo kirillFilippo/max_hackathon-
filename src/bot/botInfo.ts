@@ -1,4 +1,4 @@
-import type { Api } from '@maxhub/max-bot-api';
+import type { Api, Bot } from '@maxhub/max-bot-api';
 
 import type { Logger } from '../logger.js';
 import { certificateHint, isCertificateError } from '../tls.js';
@@ -41,3 +41,23 @@ export const publishCommands = async (
     logger.warn('Не удалось опубликовать подсказки команд, это не критично', error);
   }
 };
+
+/**
+ * Заглушка данных бота, пока MAX не ответил.
+ *
+ * Нужна из-за особенности SDK: в режиме long polling он пишет в лог
+ * `Starting @${botInfo.username}` и падает, если `botInfo` не задан, — то есть
+ * без заглушки бот после обрыва связи вообще не начал бы получать обновления.
+ * Как только MAX ответит, заглушку заменит настоящее имя.
+ */
+type BotInfo = NonNullable<Bot<never>['botInfo']>;
+
+export const botInfoPlaceholder = (username?: string): BotInfo => ({
+  user_id: 0,
+  name: 'Бот',
+  first_name: 'Бот',
+  last_name: '',
+  username: username ?? 'bot',
+  is_bot: true,
+  last_activity_time: 0,
+});

@@ -12,6 +12,10 @@ services:
     image: postgres:16-alpine
     container_name: dosug-postgres
     environment:
+      # Токен бота: можно передать переменной окружения
+      # (BOT_TOKEN=<токен> docker compose up --build) или положить в .env —
+      # compose подставит его сам, отдельный файл не обязателен.
+      BOT_TOKEN: ${BOT_TOKEN:-}
       POSTGRES_USER: ${POSTGRES_USER:-dosug}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dosug}
       POSTGRES_DB: ${POSTGRES_DB:-dosug}

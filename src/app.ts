@@ -24,7 +24,7 @@ import { TemplateService } from './services/templateService.js';
 import { type MiniappHandle } from './miniapp/server.js';
 import type { AnswerMode } from './domain/types.js';
 import { startMiniappBridge } from './app/miniappBridge.js';
-import { fetchBotInfo, publishCommands } from './bot/botInfo.js';
+import { botInfoPlaceholder, fetchBotInfo, publishCommands } from './bot/botInfo.js';
 import { createMiniappTicketStore } from './bot/miniappTickets.js';
 import { certificateHint, inspectCaCert, isCertificateError } from './tls.js';
 
@@ -169,8 +169,10 @@ export const createApp = async (
     // Знакомство с ботом не должно мешать запуску: при обрыве связи или DNS
     // MAX может не ответить, и раньше это оставляло бота без подписки на вебхук.
     const botInfo = await fetchBotInfo(bot.api, logger);
+    // Заглушка нужна для тех, кто читает имя бота до первого успешного ответа:
+    // SDK в long polling падает на `botInfo.username`, если поле не заполнено.
+    bot.botInfo = botInfo ?? botInfoPlaceholder(config.botUsername);
     if (botInfo) {
-      bot.botInfo = botInfo;
       logger.info(`Бот @${botInfo.username ?? 'unknown'} (id ${botInfo.user_id}), режим ${config.botMode}`);
       await publishCommands(bot.api, BOT_COMMANDS, logger);
     } else {

@@ -7,7 +7,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: max-dosug-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-dosug}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dosug}
@@ -30,7 +29,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: max-dosug-bot:latest
-    container_name: max-dosug-bot
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,6 +38,10 @@ services:
       - path: .env
         required: false
     environment:
+      # Токен бота: можно передать переменной окружения
+      # (BOT_TOKEN=<токен> docker compose up --build) или положить в .env —
+      # compose подставит его сам, отдельный файл не обязателен.
+      BOT_TOKEN: ${BOT_TOKEN:-}
       # Внутри compose база доступна по имени сервиса.
       DATABASE_URL: postgres://${POSTGRES_USER:-dosug}:${POSTGRES_PASSWORD:-dosug}@postgres:5432/${POSTGRES_DB:-dosug}
     # DNS внутри контейнера: публичные резолверы из домашней сети периодически
