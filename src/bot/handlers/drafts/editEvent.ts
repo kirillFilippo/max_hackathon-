@@ -157,7 +157,7 @@ export const handleEditEventDraft = async (
     case 'startsAt': {
       const parsed = parseUserDateTime(input, { tz: deps.config.appTz });
       if (!parsed) {
-        await show(ctx, withKeyboard('Не получилось разобрать дату.\n\nФорматы: «завтра 19:00», «25.10 18:30», «25 октября 19:00».', cancelRow));
+        await show(ctx, withKeyboard('Не получилось разобрать дату.\n\nФорматы: «завтра в 11:00», «25.10 18:30», «25 октября 19:00».', cancelRow));
         return true;
       }
       await applyEdit({ startsAt: parsed.date.toISOString() });

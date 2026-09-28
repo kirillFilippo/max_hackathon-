@@ -24,6 +24,47 @@ describe('parseUserDateTime', () => {
     assert.equal(parsed.date.toISOString(), '2025-10-21T16:00:00.000Z');
   });
 
+  it('понимает предлог «в» и «к» перед временем', () => {
+    // Организатор пишет и «завтра 19:00», и «завтра в 19:00» — оба варианта равны.
+    assert.equal(
+      parseUserDateTime('завтра в 19:00', { now: NOW, tz: TZ })?.date.toISOString(),
+      parseUserDateTime('завтра 19:00', { now: NOW, tz: TZ })?.date.toISOString(),
+    );
+    assert.equal(
+      parseUserDateTime('завтра в 11:00', { now: NOW, tz: TZ })?.date.toISOString(),
+      '2025-10-21T08:00:00.000Z',
+    );
+    assert.equal(
+      parseUserDateTime('сегодня к 20:30', { now: NOW, tz: TZ })?.date.toISOString(),
+      '2025-10-20T17:30:00.000Z',
+    );
+    assert.equal(
+      parseUserDateTime('25.10 в 18:30', { now: NOW, tz: TZ })?.date.toISOString(),
+      '2025-10-25T15:30:00.000Z',
+    );
+    assert.equal(
+      parseUserDateTime('25 октября в 19:00', { now: NOW, tz: TZ })?.date.toISOString(),
+      '2025-10-25T16:00:00.000Z',
+    );
+    assert.equal(
+      parseUserDateTime('в 19:00', { now: NOW, tz: TZ })?.date.toISOString(),
+      '2025-10-20T16:00:00.000Z',
+    );
+  });
+
+  it('для «завтра» время можно писать без минут', () => {
+    const parsed = parseUserDateTime('завтра в 11', { now: NOW, tz: TZ });
+    assert.equal(parsed?.date.toISOString(), '2025-10-21T08:00:00.000Z');
+    assert.equal(parsed?.hadTime, true);
+  });
+
+  it('не принимает несуществующее время и мусор с предлогом', () => {
+    assert.equal(parseUserDateTime('завтра в 25:00', { now: NOW, tz: TZ }), null);
+    assert.equal(parseUserDateTime('завтра в 11:70', { now: NOW, tz: TZ }), null);
+    assert.equal(parseUserDateTime('к завтра', { now: NOW, tz: TZ }), null);
+    assert.equal(parseUserDateTime('в подвале', { now: NOW, tz: TZ }), null);
+  });
+
   it('понимает «сегодня 20:30» и «послезавтра»', () => {
     assert.equal(
       parseUserDateTime('сегодня 20:30', { now: NOW, tz: TZ })?.date.toISOString(),

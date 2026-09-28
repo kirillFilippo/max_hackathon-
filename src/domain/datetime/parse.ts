@@ -18,13 +18,19 @@ export interface ParseOptions {
   tz?: string;
 }
 
+/**
+ * Приводит ввод к виду, который понимают шаблоны ниже. Предлоги «в» и «к» перед
+ * временем отбрасываем здесь, а не в каждом шаблоне: организатор пишет и
+ * «завтра 19:00», и «завтра в 19:00», и «сегодня к 9».
+ */
 const normalizeInput = (input: string): string =>
   input
     .trim()
     .toLowerCase()
     .replace(/ё/g, 'е')
     .replace(/,/g, ' ')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .replace(/(^| )(в|к) +(?=\d{1,2}([:.]\d{2})?$)/g, '$1');
 
 const buildDate = (
   year: number,
@@ -46,6 +52,7 @@ const buildDate = (
  *  - «2025-10-25 19:00»
  *  - «25 октября 19:00», «25 октября 2025 19:00»
  *  - «сегодня 20:00», «завтра 11:00», «послезавтра»
+ *  - «завтра в 11:00», «сегодня к 9», «25.10 в 18:30» — предлог «в»/«к» не обязателен
  *  - «19:00» — сегодня, а если время прошло — завтра
  */
 export const parseUserDateTime = (input: string, options: ParseOptions = {}): ParsedDateTime | null => {
@@ -66,6 +73,7 @@ export const parseUserDateTime = (input: string, options: ParseOptions = {}): Pa
     const hadTime = numeric[4] !== undefined;
     const hour = hadTime ? Number(numeric[4]) : DEFAULT_TIME.hour;
     const minute = hadTime ? Number(numeric[5]) : DEFAULT_TIME.minute;
+    if (hour > 23 || minute > 59) return null;
     const candidate = buildDate(year, month, day, hour, minute, tz);
     if (!candidate) return null;
     if (!numeric[3] && candidate.getTime() < todayStart.getTime()) {
@@ -110,12 +118,13 @@ export const parseUserDateTime = (input: string, options: ParseOptions = {}): Pa
     return { date: candidate, hadTime };
   }
 
-  const relative = /^(сегодня|завтра|послезавтра)(?: (\d{1,2})[:.](\d{2}))?$/.exec(raw);
+  const relative = /^(сегодня|завтра|послезавтра)(?: (\d{1,2})(?:[:.](\d{2}))?)?$/.exec(raw);
   if (relative) {
     const offset = relative[1] === 'сегодня' ? 0 : relative[1] === 'завтра' ? 1 : 2;
     const hadTime = relative[2] !== undefined;
     const hour = hadTime ? Number(relative[2]) : DEFAULT_TIME.hour;
-    const minute = hadTime ? Number(relative[3]) : DEFAULT_TIME.minute;
+    const minute = hadTime && relative[3] !== undefined ? Number(relative[3]) : 0;
+    if (hour > 23 || minute > 59) return null;
     const base = new Date(todayStart.getTime() + offset * 86_400_000);
     const baseParts = tzParts(base, tz);
     const date = buildDate(baseParts.year, baseParts.month, baseParts.day, hour, minute, tz);
