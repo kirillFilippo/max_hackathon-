@@ -16,7 +16,7 @@ import { show, type BotContext } from '../context.js';
 import type { AppDeps } from '../deps.js';
 import { button, cb, link, withKeyboard, type KeyboardRows, type MessageContent } from '../message.js';
 import type { EventDraftData, FieldEditorHost } from '../session.js';
-import { fieldsEditor } from '../texts/event.js';
+import { fieldsEditor } from '../texts/event/index.js';
 import { botUsernameOf, userIdOf } from './helpers.js';
 
 /**
@@ -34,6 +34,20 @@ export const renderFieldsScreen = async (
   host: QuestionsHost,
 ): Promise<void> => {
   await show(ctx, fieldsEditor(host.fields, host.data?.answerMode ?? 'auto'));
+};
+
+/**
+ * Кому адресован пропуск конструктора: пользователь, чат и сессия мастера.
+ * Ключ сессии — то же значение, что использует middleware сессий MAX (`userId:chatId`):
+ * по нему конструктор находит «свой» черновик, когда у пользователя несколько чатов.
+ */
+const ticketTargetOf = (
+  ctx: BotContext,
+): { userId: number; chatId: number; sessionKey: string } | null => {
+  const userId = ctx.user?.user_id;
+  const chatId = ctx.chatId;
+  if (userId == null || chatId == null) return null;
+  return { userId, chatId, sessionKey: `${userId}:${chatId}` };
 };
 
 /**
@@ -59,8 +73,17 @@ export const openQuestionsApp = async (
     return;
   }
 
+  const target = ticketTargetOf(ctx);
+  if (!target) {
+    await show(
+      ctx,
+      withKeyboard('Не удалось определить чат — откройте мастер заново.', [[cb('В меню', CB.menuMain)]]),
+    );
+    return;
+  }
+
   const ticket = newTicket();
-  await deps.miniapp.registerTicket(ticket, { userId: userIdOf(ctx), at: Date.now() });
+  await deps.miniapp.registerTicket(ticket, { ...target, at: Date.now() });
   const username = botUsernameOf(ctx, deps);
   const rows: KeyboardRows = [];
 
@@ -70,7 +93,7 @@ export const openQuestionsApp = async (
     // Ник бота неизвестен — остаётся прямая ссылка на мини-приложение.
     rows.push([button.openApp('Открыть конструктор', deps.miniapp.buildUrl(ticket))]);
   }
-  rows.push([cb('Вернуться к вопросам', CB.draftSkip)]);
+  rows.push([cb('Вернуться к вопросам', cbQuestionsModeBack('draft'))]);
 
   await show(
     ctx,

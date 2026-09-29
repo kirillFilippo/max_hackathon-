@@ -4,7 +4,8 @@ import { describe, it } from 'node:test';
 
 import { parseItemNumbers } from '../src/services/itemService.js';
 import { PRESET_TEMPLATES, fieldsFromPreset, describeField } from '../src/domain/presets.js';
-import { FAQ_ITEMS, answerFaq, matchFaq } from '../src/services/faqService.js';
+import { FAQ_ITEMS } from '../src/domain/faq.js';
+import { answerFaq, matchFaq } from '../src/services/faqService.js';
 import { createEvent, startHarness, register } from './support.js';
 describe('parseItemNumbers', () => {
   it('разбирает номера позиций', () => {

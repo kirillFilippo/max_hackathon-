@@ -1,4 +1,3 @@
-import type { ParticipantStatus } from '../../../../domain/types.js';
 import { type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import { startContactDraft } from '../../features/profile.js';

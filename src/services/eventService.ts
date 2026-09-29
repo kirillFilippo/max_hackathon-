@@ -1,6 +1,6 @@
 import { buildInviteUrl } from '../domain/links.js';
 import type { AppConfig } from '../config.js';
-import { formatDateTime } from '../domain/datetime.js';
+import { formatDateTime } from '../domain/datetime/index.js';
 import type { Repositories } from '../db/repositories/index.js';
 import { computeEventStats } from '../domain/stats.js';
 import { questionnaireWeight, resolveAnswerMode } from '../domain/questionnaire.js';

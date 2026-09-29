@@ -182,7 +182,7 @@ export const createBotHarness = async (
   const items = new ItemService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, base.config);
-  const debug = new DebugService({ events, participants, items }, base.config);
+  const debug = new DebugService({ events, participants, items });
   const notifier = createApiNotifier(bot.api);
 
   const deps: AppDeps = {

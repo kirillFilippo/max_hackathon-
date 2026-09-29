@@ -1,4 +1,4 @@
-import { formatDateTime, formatRelative } from '../domain/datetime.js';
+import { formatDateTime, formatRelative } from '../domain/datetime/index.js';
 import { FAQ_ITEMS, type FaqItem } from '../domain/faq.js';
 import { goingParticipants, isGoing } from '../domain/stats.js';
 import { normalizeUserText } from '../domain/text.js';
@@ -8,9 +8,6 @@ import type {
   ItemWithReservation,
   Participant,
 } from '../domain/types.js';
-
-export { FAQ_ITEMS };
-export type { FaqItem };
 
 export interface FaqContext {
   event?: DosugEvent;
@@ -87,11 +84,6 @@ export const answerFaq = (item: FaqItem, context: FaqContext): string => {
       return free > 0
         ? `Лимит ${event.limit}, свободно ${free} мест.`
         : `Лимит ${event.limit} исчерпан. Бот запишет вас в лист ожидания и сообщит, если место освободится.`;
-    }
-    case 'money': {
-      return 'Бот помогает собрать людей и не дублировать покупки: позиции списка бронируются, '
-        + 'каждый видит, что берёт он, а что уже взяли другие. '
-        + 'Разделение трат и переводы между участниками — в планах: сейчас бот деньги не считает.';
     }
     default:
       return item.answer;

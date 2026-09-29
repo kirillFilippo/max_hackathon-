@@ -1,10 +1,10 @@
-import type { ParticipantStatus } from '../../../../domain/types.js';
 import { show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
+import { CB } from '../../../callbacks.js';
 import { cb, withKeyboard } from '../../../message.js';
 import { answerModeScreen } from '../../questions.js';
 import { showEventCard } from '../../features/events.js';
-import { findEventOrNotify, menuRow } from '../../helpers.js';
+import { findEventOrNotify, isOrganizerOf, refuseNotOrganizer } from '../../helpers.js';
 
 
 export const handleQuestions = async (
@@ -15,11 +15,20 @@ export const handleQuestions = async (
 // «Способ ответа на анкету» для опубликованного события: скрытая настройка,
 // которую организатор может переопределить.
 const [sub, scope = '', mode = ''] = args;
-if (scope === 'draft') return;
+// Кнопки с scope «draft» обрабатывает мастер: у него есть сам черновик.
+if (scope === 'draft') {
+  await show(
+    ctx,
+    withKeyboard('Этот экран устарел: откройте событие заново, черновик мастера не активен.', [
+      [cb('К событиям', CB.menuEvents)],
+    ]),
+  );
+  return;
+}
 const event = await findEventOrNotify(ctx, deps, scope);
 if (!event) return;
-if (event.organizerId !== ctx.user?.user_id) {
-  await show(ctx, withKeyboard('Менять способ ответа может только организатор.', menuRow));
+if (!isOrganizerOf(ctx, event)) {
+  await refuseNotOrganizer(ctx, 'Менять способ ответа может только организатор.');
   return;
 }
 if (sub === 'mode') {
@@ -43,7 +52,7 @@ await show(
   ctx,
   withKeyboard(
     'Конструктор вопросов открывается из мастера создания события или из шаблона.',
-    [[cb('Создать событие', 'ev:new')]],
+    [[cb('Создать событие', CB.eventNew)]],
   ),
 );
 return;

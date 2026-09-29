@@ -1,13 +1,12 @@
-import { formatDateTime } from '../../../../domain/datetime.js';
+import { formatDateTime } from '../../../../domain/datetime/index.js';
 import { type ParticipantStatus } from '../../../../domain/types.js';
 import { replyTo, show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import { cb, text, withKeyboard } from '../../../message.js';
-import type { DraftState, RegisterStep } from '../../../session.js';
-import { participantEventCard } from '../../../texts/event.js';
+import { participantEventCard } from '../../../texts/event/index.js';
 import { resolveAnswerMode } from '../../../../domain/questionnaire.js';
-import { buildAnswersUrl } from '../../../callbacks.js';
-import { statusRow } from '../../../texts/registration.js';
+import { buildAnswersUrl, cbShopShow } from '../../../callbacks.js';
+import { statusRow } from '../../../texts/registration/index.js';
 import { eventViewOptions } from '../../features/events.js';
 import {
   botUsernameOf,
@@ -16,7 +15,7 @@ import {
   notifyParticipants,
   requireUser,
 } from '../../helpers.js';
-import { contactPrompt } from '../../../texts/registration.js';
+import { contactPrompt } from '../../../texts/registration/index.js';
 import { renderConfirm } from './screens.js';
 
 export const quickStatusChange = async (
@@ -50,7 +49,7 @@ export const quickStatusChange = async (
         ctx,
         withKeyboard(
           `Освобождены ваши позиции из списка покупок: ${result.releasedItems.map((item) => item.title).join(', ')}.`,
-          [[cb('Список покупок', `shop:show:${event.code}`)]],
+          [[cb('Список покупок', cbShopShow(event.code))]],
         ),
       );
       await notifyParticipants(
@@ -104,12 +103,3 @@ export const quickStatusChange = async (
     await show(ctx, contactPrompt(event));
   }
 };
-
-/**
- * Какие `reg:*`-кнопки принадлежат мастеру регистрации на текущем шаге.
- *
- * Мастер не должен забирать чужие кнопки: «Иду» из напоминания, статус из карточки
- * участника или «Изменить ответы» — это не шаги мастера. Раньше любой `reg:*`
- * перехватывался черновиком, и нажатие «Иду» в напоминании просто перерисовывало
- * шаг мастера: подтвердить участие было невозможно, пока черновик не закрыт.
- */

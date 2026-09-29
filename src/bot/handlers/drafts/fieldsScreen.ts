@@ -4,11 +4,9 @@ import type { AppDeps } from '../../deps.js';
 import { CB } from '../../callbacks.js';
 import type { AnswerMode } from '../../../domain/types.js';
 import { cb, withKeyboard } from '../../message.js';
-import type { FieldEditorState } from '../../session.js';
-import { fieldsEditor } from '../../texts/event.js';
 import { userText } from '../../context.js';
 import { answerModeScreen, openQuestionsApp, type QuestionsHost } from '../questions.js';
-import { MAX_FIELDS, handleFieldEditorCallback, handleFieldEditorText, renderEditorScreen, startFieldEditor } from './editor.js';
+import { MAX_FIELDS, handleFieldEditorCallback, handleFieldEditorText, renderEditorScreen, startFieldEditor } from './editor/index.js';
 
 /**
  * Общая обработка экрана вопросов для всех мастеров, где вопросы редактируются
@@ -95,16 +93,6 @@ export const handleFieldsScreenInput = async (
     return true;
   }
 
-  if (isCallback && action === 'draft' && args[0] === 'fieldpreset') {
-    const label = args.slice(1).join(':').trim();
-    if (label) {
-      const { normalizeField } = await import('../../../domain/questionnaire.js');
-      const { newFieldId } = await import('../../../domain/ids.js');
-      host.fields.push(normalizeField({ id: newFieldId(), label: label.slice(0, 140), type: 'text' }));
-    }
-    return false;
-  }
-
   if (isCallback && action === 'draft' && args[0] === 'fieldremove') {
     const index = Number(args[1]);
     if (Number.isInteger(index) && index >= 0 && index < host.fields.length) {
@@ -121,6 +109,3 @@ export const callbackArgs = (ctx: BotContext): { action: string; args: string[] 
   ctx.updateType === 'message_callback'
     ? parseCallback(ctx.callback?.payload ?? '')
     : { action: '', args: [] };
-
-export type { FieldEditorState };
-export { fieldsEditor };

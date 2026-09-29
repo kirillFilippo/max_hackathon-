@@ -1,16 +1,7 @@
-import { formatDateTime } from '../../../domain/datetime.js';
+import { formatDateTime } from '../../../domain/datetime/index.js';
 import { describeField } from '../../../domain/presets.js';
 import { EFFECTIVE_MODE_LABELS, resolveAnswerMode } from '../../../domain/questionnaire.js';
-import type {
-  AnswerMode,
-  DosugEvent,
-  EventField,
-  EventStats,
-  ItemWithReservation,
-  Participant,
-  PlaceCoords,
-  Template,
-} from '../../../domain/types.js';
+import type { EventField, PlaceCoords } from '../../../domain/types.js';
 import { CB } from '../../callbacks.js';
 import {
   cb,

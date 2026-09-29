@@ -2,11 +2,21 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import type { BotSession } from '../src/bot/session.js';
-import { createMiniappTicketStore, TICKET_TTL_MS } from '../src/bot/miniappTickets.js';
+import type { MiniappTicket } from '../src/miniapp/contracts.js';
+import { createMiniappTicketStore, TICKET_TTL_MS, ticketKey } from '../src/bot/miniappTickets.js';
 import { PgSessionStore } from '../src/db/sessions.js';
 import type { SessionsStore } from '../src/db/storage.js';
 import { startHarness, type Harness } from './support.js';
 import { after, before } from 'node:test';
+
+/** Пропуск: пользователь, чат, сессия мастера и время выдачи. */
+const owner = (userId: number, overrides: Partial<MiniappTicket> = {}): MiniappTicket => ({
+  userId,
+  chatId: userId,
+  sessionKey: `${userId}:${userId}`,
+  at: Date.now(),
+  ...overrides,
+});
 
 /** Хранилище сессий в памяти: проверяем саму логику пропусков, без базы. */
 const memorySessions = (): SessionsStore<object> => {
@@ -36,7 +46,7 @@ describe('Подписи конструктора мини-приложения'
   it('выданная подпись работает и после перезапуска бота', async () => {
     const sessions = memorySessions();
     const before = createMiniappTicketStore(sessions);
-    await before.register('abc123', { userId: 42, at: Date.now() });
+    await before.register('abc123', owner(42));
 
     // Новый процесс поверх того же хранилища — как после деплоя.
     const restarted = createMiniappTicketStore(sessions);
@@ -52,10 +62,24 @@ describe('Подписи конструктора мини-приложения'
     assert.equal(await store.take(''), null);
   });
 
+  it('пропуск без чата или сессии мастера недействителен', async () => {
+    // Такие записи остались от версии, где черновик искали «первый подходящий
+    // у пользователя»: пропуск без адреса и сессии не должен пускать в мастер.
+    const sessions = memorySessions();
+    const store = createMiniappTicketStore(sessions);
+    await sessions.set(ticketKey('legacy-1'), { userId: 5, at: Date.now(), sessionKey: '5:5' });
+    await sessions.set(ticketKey('legacy-2'), { userId: 5, at: Date.now(), chatId: 5 });
+    assert.equal(await store.take('legacy-1'), null);
+    assert.equal(await store.take('legacy-2'), null);
+
+    await store.register('good', owner(5));
+    assert.equal((await store.take('good'))?.chatId, 5);
+  });
+
   it('просроченная подпись не работает и удаляется', async () => {
     const sessions = memorySessions();
     const store = createMiniappTicketStore(sessions, 1000);
-    await store.register('old', { userId: 7, at: Date.now() - 5000 });
+    await store.register('old', owner(7, { at: Date.now() - 5000 }));
     assert.equal(await store.take('old'), null);
     // Запись вычищена, повторное обращение тоже пустое.
     assert.equal(await store.take('old'), null);
@@ -63,7 +87,7 @@ describe('Подписи конструктора мини-приложения'
 
   it('подпись живёт ограниченное время, но не пропадает сразу', async () => {
     const store = createMiniappTicketStore(memorySessions());
-    await store.register('fresh', { userId: 8, at: Date.now() });
+    await store.register('fresh', owner(8));
     assert.equal((await store.take('fresh'))?.userId, 8);
     assert.ok(TICKET_TTL_MS >= 5 * 60 * 1000, 'слишком короткий срок жизни подписи');
   });
@@ -83,7 +107,7 @@ describe('Подписи конструктора в PostgreSQL', () => {
   it('переживают перезапуск процесса: подпись читается новым экземпляром', async () => {
     const sessions = new PgSessionStore<BotSession>(harness.db, 3_600_000);
     const first = createMiniappTicketStore(sessions as unknown as SessionsStore<object>);
-    await first.register('ticket-1', { userId: 99, at: Date.now() });
+    await first.register('ticket-1', owner(99));
 
     // Другой экземпляр поверх той же базы — эмуляция нового процесса.
     const second = createMiniappTicketStore(

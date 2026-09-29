@@ -1,14 +1,13 @@
-import { formatDateTime } from '../../../../domain/datetime.js';
+import { formatDateTime } from '../../../../domain/datetime/index.js';
 import { STATUS_LABELS } from '../../../../domain/types.js';
 import { cbEventCard } from '../../../callbacks.js';
 import { show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import { cb, withKeyboard } from '../../../message.js';
-import type { DraftState, RegisterStep } from '../../../session.js';
-import { invitationCard, participantEventCard } from '../../../texts/event.js';
+import { invitationCard, participantEventCard } from '../../../texts/event/index.js';
 import { resolveAnswerMode } from '../../../../domain/questionnaire.js';
 import { buildAnswersUrl } from '../../../callbacks.js';
-import { answerFormCard } from '../../../texts/registration.js';
+import { answerFormCard } from '../../../texts/registration/index.js';
 import { eventViewOptions } from '../../features/events.js';
 import {
   botUsernameOf,
@@ -17,7 +16,7 @@ import {
   requireUser,
   userIdOf,
 } from '../../helpers.js';
-import { namePrompt } from '../../../texts/registration.js';
+import { namePrompt } from '../../../texts/registration/index.js';
 import { renderConfirm, renderField } from './screens.js';
 
 export const startRegistration = async (
@@ -205,5 +204,3 @@ export const startEditRegistration = async (
   }
   await renderField(ctx, deps, event, ctx.session.draft);
 };
-
-/** Быстрая смена статуса (кнопки в карточках и напоминаниях). */

@@ -1,13 +1,13 @@
-import { parseCallback } from '../../callbacks.js';
+import { CB, parseCallback } from '../../callbacks.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
-import { handleCreateEventDraft } from '../drafts/createEvent.js';
+import { handleCreateEventDraft } from '../drafts/createEvent/index.js';
 import { handleEditEventDraft } from '../drafts/editEvent.js';
 import { handleItemReserveDraft, handleItemsAddDraft } from '../drafts/items.js';
 import { handleProfileContactDraft } from '../drafts/profileContact.js';
-import { handleRegisterDraft } from '../drafts/register.js';
-import { registerDraftOwnsCallback } from '../drafts/register.js';
+import { handleRegisterDraft } from '../drafts/register/index.js';
+import { registerDraftOwnsCallback } from '../drafts/register/index.js';
 import {
   handleEditTemplateDraft,
   handleNewTemplateDraft,
@@ -90,7 +90,7 @@ export const handleDraft = async (ctx: BotContext, deps: AppDeps): Promise<boole
     default: {
       if (ctx.session) ctx.session.draft = null;
       await show(ctx, withKeyboard('Черновик устарел, начните заново.', [
-        [cb('В меню', 'menu:main')],
+        [cb('В меню', CB.menuMain)],
       ]));
       return true;
     }

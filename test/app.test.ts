@@ -58,13 +58,22 @@ describe('Сборка приложения', () => {
       assert.ok(bridge, 'мост мини-приложения не собран');
 
       // Ссылка конструктора строится по подписи и ведёт на страницу вопросов.
-      await bridge.registerTicket('ticket-1', { userId: 7, at: Date.now() });
+      await bridge.registerTicket('ticket-1', {
+        userId: 7,
+        chatId: 42,
+        sessionKey: '7:42',
+        at: Date.now(),
+      });
       const url = bridge.buildUrl('ticket-1');
       assert.match(url, /^https:\/\/example\.test\/app\/questions\?t=ticket-1$/);
 
       // Подпись выдана ботом и проверяется тем же хранилищем сессий.
       const owner = await bridge.takeTicket('ticket-1');
       assert.equal(owner?.userId, 7);
+      // Ключ сессии и чат едут вместе с подписью: по сессии конструктор находит
+      // свой черновик, а по чату бот возвращает обновлённый экран.
+      assert.equal(owner?.sessionKey, '7:42');
+      assert.equal(owner?.chatId, 42);
       assert.equal(await bridge.takeTicket('нет-такой'), null);
     } finally {
       await app.stop();

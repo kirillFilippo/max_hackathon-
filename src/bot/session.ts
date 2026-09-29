@@ -89,10 +89,7 @@ export type DraftState =
     }
   | { kind: 'items-add'; step: 'titles'; eventId: string; eventCode: string }
   | { kind: 'item-reserve'; step: 'numbers'; eventId: string; eventCode: string }
-  | { kind: 'item-price'; step: 'amount'; itemId: string; eventCode: string; itemTitle: string }
-  | { kind: 'payment-details'; step: 'bank' | 'handle'; requestId: string; bankName?: string }
-  | { kind: 'profile-contact'; step: 'contact' }
-  | { kind: 'profile-payment'; step: 'bank' | 'handle'; bankName?: string };
+  | { kind: 'profile-contact'; step: 'contact' };
 
 export interface BotSession {
   draft?: DraftState | null;

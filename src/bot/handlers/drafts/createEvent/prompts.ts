@@ -1,5 +1,4 @@
-import { formatDate } from '../../../../domain/datetime.js';
-import type { DraftState } from '../../../session.js';
+import { formatDate } from '../../../../domain/datetime/index.js';
 import { CB, cbDraftTemplate } from '../../../callbacks.js';
 import type { AppDeps } from '../../../deps.js';
 import {

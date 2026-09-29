@@ -1,20 +1,18 @@
-import type { ParticipantStatus } from '../../../../domain/types.js';
 import { show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import {
   closeEvent,
-  openEventForParticipant,
   remindNow,
+  requireOwnEventOrCard,
   showEventCard,
   showEventDetails,
   showEventList,
   showInviteLink,
   showParticipants,
 } from '../../features/events.js';
-import { startCreateEvent } from '../../drafts/createEvent.js';
+import { startCreateEvent } from '../../drafts/createEvent/index.js';
 import { startEditField } from '../../drafts/editEvent.js';
-import { editMenu } from '../../../texts/event.js';
-import { findEventOrNotify } from '../../helpers.js';
+import { editMenu } from '../../../texts/event/index.js';
 
 
 export const handleEvent = async (
@@ -31,12 +29,8 @@ switch (sub) {
     await showEventList(ctx, deps);
     return;
   case 'card': {
-    const event = await deps.events.findByCode(code);
-    if (event && event.organizerId !== ctx.user?.user_id) {
-      await openEventForParticipant(ctx, deps, code);
-      return;
-    }
-    await showEventCard(ctx, deps, code);
+    const event = await requireOwnEventOrCard(ctx, deps, code);
+    if (event) await showEventCard(ctx, deps, code);
     return;
   }
   case 'people':
@@ -49,13 +43,13 @@ switch (sub) {
     await showEventDetails(ctx, deps, code);
     return;
   case 'edit': {
-    const event = await findEventOrNotify(ctx, deps, code);
+    const event = await requireOwnEventOrCard(ctx, deps, code);
     if (!event) return;
     await show(ctx, editMenu(event));
     return;
   }
   case 'set': {
-    const event = await findEventOrNotify(ctx, deps, code);
+    const event = await requireOwnEventOrCard(ctx, deps, code);
     if (!event) return;
     await startEditField(ctx, deps, event.id, extra as 'title' | 'startsAt' | 'place' | 'description' | 'limit');
     return;

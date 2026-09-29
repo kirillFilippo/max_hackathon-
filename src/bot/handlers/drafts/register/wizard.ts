@@ -2,8 +2,8 @@ import { STATUS_LABELS, type ParticipantStatus } from '../../../../domain/types.
 import { validateAnswer } from '../../../../domain/validation.js';
 import { show, userText, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
-import { text, withKeyboard } from '../../../message.js';
-import type { DraftState, RegisterStep } from '../../../session.js';
+import { withKeyboard } from '../../../message.js';
+import type { RegisterStep } from '../../../session.js';
 import { findEventOrNotify, menuRow, userIdOf } from '../../helpers.js';
 import { callbackArgs } from '../fieldsScreen.js';
 import {
@@ -12,7 +12,7 @@ import {
   namePrompt,
   registerFieldPrompt,
   statusPrompt,
-} from '../../../texts/registration.js';
+} from '../../../texts/registration/index.js';
 import {
   goToFieldsOrConfirm,
   renderConfirm,

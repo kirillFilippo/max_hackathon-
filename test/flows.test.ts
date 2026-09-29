@@ -255,8 +255,7 @@ describe('Защита от двойных нажатий', () => {
   });
 });
 
-describe('Ссылка-приглашение не дублирует карточку', () => {
-  it('отвечает одним сообщением, когда MAX присылает и bot_started, и /start', async () => {
+describe('Ссылка-приглашение не дублирует карточку', () => {  it('отвечает одним сообщением, когда MAX присылает и bot_started, и /start', async () => {
     const event = await harness.events.create({
       title: 'Встреча',
       description: '',
@@ -449,8 +448,41 @@ describe('Вопросы: выбор готового набора и кнопк
         `конструктор открывается не ссылкой мини-приложения: ${open.url}`,
       );
       assert.equal(tickets.length, 1, 'подпись мастера не выдана');
+
+      // «Вернуться к вопросам» — возврат к списку, а не «дальше» по мастеру
+      // (раньше эта кнопка несла draft:skip и уводила к подтверждению события).
+      const back = harness.lastButtons().find((button) => button.text === 'Вернуться к вопросам');
+      assert.ok(back, 'нет кнопки возврата к вопросам');
+      assert.equal(back.payload, 'q:back:draft');
+
+      await harness.click(back.payload);
+      noErrors();
+      assert.match(harness.lastText(), /Вопросы участникам/);
+      assert.doesNotMatch(
+        harness.texts().join('\n'),
+        /Проверьте событие|Сохранить набор/,
+        'возврат из конструктора проматывает мастер вперёд',
+      );
     } finally {
       harness.deps.miniapp = null;
     }
+  });
+
+  it('устаревшая кнопка вопросов отвечает, а не молчит', async () => {
+    // Так бывает, когда мастер уже закрыт, а в чате осталось старое сообщение:
+    // кнопка со scope «draft» доходит до общего роутера. Молчание выглядит
+    // как поломка бота, поэтому должен быть ответ и выход.
+    await harness.sendText('привет');
+    harness.clearSent();
+    await harness.click('q:mode:draft');
+
+    const answer = harness.lastText();
+    assert.ok(answer.trim().length > 0, 'бот промолчал на устаревшую кнопку');
+    assert.doesNotMatch(answer, /Не получилось выполнить/);
+    assert.match(answer, /устарел|не активен/);
+    assert.ok(
+      harness.lastButtons().some((button) => /К событиям/.test(button.text)),
+      'нет кнопки выхода из устаревшего экрана',
+    );
   });
 });

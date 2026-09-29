@@ -1,6 +1,5 @@
-import { parseLimit, parseUserDateTime } from '../../../domain/datetime.js';
+import { parseLimit, parseUserDateTime } from '../../../domain/datetime/index.js';
 import { addressWarning, normalizePlace } from '../../../domain/maps.js';
-import { parseCallback } from '../../callbacks.js';
 import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import {
@@ -12,9 +11,9 @@ import {
   withMarkdownKeyboard,
 } from '../../message.js';
 import type { DraftState } from '../../session.js';
-import { placeConfirm, placePrompt } from '../../texts/event.js';
-import { cbEventCard } from '../../callbacks.js';
-import { findEventByIdOrNotify, menuRow, notifyParticipants, userIdOf } from '../helpers.js';
+import { placeConfirm, placePrompt } from '../../texts/event/index.js';
+import { cbEventCard, cbRegStatus } from '../../callbacks.js';
+import { findEventByIdOrNotify, isOrganizerOf, notifyParticipants, refuseNotOrganizer } from '../helpers.js';
 import { callbackArgs } from './fieldsScreen.js';
 
 export type EditEventDraft = Extract<DraftState, { kind: 'edit-event' }>;
@@ -33,6 +32,14 @@ export const startEditField = async (
   eventId: string,
   fieldName: EditEventDraft['fieldName'],
 ): Promise<void> => {
+  // Права проверяются ещё и здесь: черновик правки не должен появиться у того,
+  // кто не организатор, даже если кнопка пришла из старого сообщения.
+  const event = await findEventByIdOrNotify(ctx, deps, eventId);
+  if (!event) return;
+  if (!isOrganizerOf(ctx, event)) {
+    await refuseNotOrganizer(ctx);
+    return;
+  }
   if (!ctx.session) return;
   ctx.session.draft = {
     kind: 'edit-event',
@@ -82,8 +89,8 @@ export const handleEditEventDraft = async (
           ].join('\n'),
           [
             [
-              cb('Иду', `reg:status:${updated.code}:going`),
-              cb('Не смогу', `reg:status:${updated.code}:not_going`),
+              cb('Иду', cbRegStatus(updated.code, 'going')),
+              cb('Не смогу', cbRegStatus(updated.code, 'not_going')),
             ],
           ],
         ),
@@ -159,5 +166,3 @@ export const handleEditEventDraft = async (
       return true;
   }
 };
-
-export { userIdOf };

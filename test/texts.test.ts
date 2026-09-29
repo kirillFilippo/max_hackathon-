@@ -24,8 +24,8 @@ import {
   placeConfirm,
   templateCard,
   templatesList,
-} from '../src/bot/texts/event.js';
-import { finalReminder } from '../src/bot/texts/registration.js';
+} from '../src/bot/texts/event/index.js';
+import { finalReminder } from '../src/bot/texts/registration/index.js';
 import { contentToExtra as toSendExtra } from '../src/bot/context.js';
 import { myItems, reserveResult, shoppingList } from '../src/bot/texts/shopping.js';
 import { createEvent, register, startHarness, type Harness } from './support.js';

@@ -1,4 +1,4 @@
-import { formatDateTime } from '../../../domain/datetime.js';
+import { formatDateTime } from '../../../domain/datetime/index.js';
 import { STATUS_LABELS } from '../../../domain/types.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';

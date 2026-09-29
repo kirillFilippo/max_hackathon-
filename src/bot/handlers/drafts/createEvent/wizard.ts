@@ -5,15 +5,13 @@ import {
   parseUserTime,
   tzParts,
   zonedToUtc,
-} from '../../../../domain/datetime.js';
+} from '../../../../domain/datetime/index.js';
 import { addressWarning, normalizePlace } from '../../../../domain/maps.js';
 import { questionnaireFingerprint } from '../../../../domain/questionnaire.js';
-import type { DraftState } from '../../../session.js';
-import { CB } from '../../../callbacks.js';
 import { show, userText, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
-import { cancelRow, cb, withKeyboard } from '../../../message.js';
-import { createSummary, placeConfirm, placePrompt } from '../../../texts/event.js';
+import { cancelRow, withKeyboard } from '../../../message.js';
+import { createSummary, placeConfirm, placePrompt } from '../../../texts/event/index.js';
 import { renderFieldsScreen } from '../../questions.js';
 import { handleFieldsScreenInput } from '../fieldsScreen.js';
 import { eventViewOptions } from '../../features/events.js';

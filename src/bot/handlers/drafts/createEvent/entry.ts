@@ -1,8 +1,5 @@
-import type { DraftState } from '../../../session.js';
 import { show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
-
-
 
 import { promptTitle } from './prompts.js';
 

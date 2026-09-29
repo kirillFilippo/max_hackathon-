@@ -2,16 +2,30 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { AnswerMode, EventField, FieldType, ParticipantStatus } from '../domain/types.js';
 import type { Logger } from '../logger.js';
-import type { MiniappTicket } from './questionsPage.js';
-
-// Пропуск конструктора описывает страница вопросов — реэкспортируем для удобства.
-export type { MiniappTicket };
 
 /**
  * Контракты мини-приложения: что бот отдаёт странице и что страница присылает
  * обратно. Лежат отдельно от HTTP-сервера, чтобы `app.ts` и слой бота не зависели
  * от реализации маршрутов.
  */
+
+/**
+ * Пропуск конструктора вопросов: кто, из какого чата и в какой сессии мастера
+ * открыл приложение.
+ *
+ * `chatId` и `sessionKey` обязательны: по сессии конструктор находит «свой»
+ * черновик (у пользователя их может быть несколько — по одному на чат), а по чату
+ * бот присылает обратно обновлённый экран. Пропуск без этих полей считается
+ * недействительным, а не «угадывается» по первому подходящему черновику.
+ */
+export interface MiniappTicket {
+  userId: number;
+  /** Чат, из которого открыли конструктор. */
+  chatId: number;
+  /** Ключ сессии мастера (`userId:chatId`). */
+  sessionKey: string;
+  at: number;
+}
 
 export interface MiniappField {
   label: string;
@@ -81,10 +95,10 @@ export interface MiniappDeps {
   /** Проверяет одноразовую подпись мастера (или null, если она истекла/неизвестна). */
   takeTicket: (ticket: string) => Promise<MiniappTicket | null>;
   /** Текущий черновик организатора: его конструктор подтягивает по подписи. */
-  getDraft: (userId: number) => Promise<MiniappDraft | null>;
+  getDraft: (ticket: MiniappTicket) => Promise<MiniappDraft | null>;
   /** Вызывается ботом: сохранить поля в черновик организатора и обновить сообщение. */
   onFieldsSaved: (
-    userId: number,
+    ticket: MiniappTicket,
     fields: MiniappField[],
     answerMode: AnswerMode,
     name: string,

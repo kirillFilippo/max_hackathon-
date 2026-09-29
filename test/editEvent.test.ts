@@ -120,9 +120,22 @@ describe('Редактирование события', () => {
     harness.clearSent();
     const event = await setup();
 
+    // Участник открывает карточку правок: меню правок ему не показывают.
+    await harness.click(`ev:edit:${event.code}`, { chatId: 2001, userId: 2001 });
+    assert.doesNotMatch(harness.lastText(2001), /Что меняем/);
+
+    // И шаг правки не открывается: черновик чужому пользователю не создаётся.
+    await harness.clearSent();
     await harness.click(`ev:set:${event.code}:title`, { chatId: 2001, userId: 2001 });
     const answer = harness.lastText(2001);
     assert.ok(answer.trim().length > 0);
+
+    const sessions = await harness.base.deps.sessions.findByUser(2001);
+    const drafts = sessions.filter((row) => Boolean((row.value as { draft?: unknown }).draft));
+    assert.deepEqual(drafts, [], 'черновик правки создан для не-организатора');
+
+    // Даже если участник продолжит как мастер правки, событие не изменится.
+    await harness.sendText('Взломанное название', { chatId: 2001, userId: 2001 });
     assert.equal((await harness.base.events.findByCode(event.code))?.title, 'Настолки');
   });
 });

@@ -1,5 +1,4 @@
-import type { ParticipantStatus } from '../../../../domain/types.js';
-import { show, type BotContext } from '../../../context.js';
+import type { BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import {
   notifyShoppingList,

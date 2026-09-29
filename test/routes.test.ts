@@ -47,8 +47,8 @@ describe('Маршрутизация кнопок: дымовые проверк
     return texts.join('\n');
   };
 
-  it('меню: помощь, частые вопросы, расчёты и профиль', async () => {
-    for (const payload of ['menu:help', 'menu:faq', 'menu:duties', 'menu:profile', 'menu:events']) {
+  it('меню: помощь, частые вопросы и профиль', async () => {
+    for (const payload of ['menu:help', 'menu:faq', 'menu:profile', 'menu:events']) {
       const answer = await clickOk(payload);
       assert.ok(answer.trim().length > 0);
     }
@@ -184,16 +184,124 @@ describe('Маршрутизация кнопок: дымовые проверк
     assert.doesNotMatch(answer, /Не получилось выполнить/);
   });
 
-  it('профиль: сохранение контакта и реквизитов', async () => {
+  it('профиль: сохранение контакта для связи', async () => {
     harness.clearSent();
     await harness.click('profile:contact', { chatId: 1500, userId: 1500 });
     await harness.sendText('+7 900 000-11-22', { chatId: 1500, userId: 1500 });
     const withContact = await harness.base.profiles.get(1500);
     assert.equal(withContact?.contact, '+7 900 000-11-22');
 
-    await harness.click('profile:payment', { chatId: 1500, userId: 1500 });
-    await harness.sendText('Тинькофф', { chatId: 1500, userId: 1500 });
-    await harness.sendText('+7 900 000-11-22', { chatId: 1500, userId: 1500 });
-    const withDetails = await harness.base.profiles.get(1500);
+    // Контакт переживает показ профиля заново: он сохранён в БД, а не в памяти шага.
+    await harness.clearSent();
+    await harness.click('menu:profile', { chatId: 1500, userId: 1500 });
+    const shown = await harness.base.profiles.get(1500);
+    assert.equal(shown?.contact, '+7 900 000-11-22');
+    assert.match(harness.lastText(1500), /\+7 900 000-11-22/);
+  });
+
+  /**
+   * Права: участник не управляет чужим событием, даже если кнопка пришла из
+   * старого сообщения. Проверяем и ответ, и то, что состояние не изменилось —
+   * иначе проверка «бот что-то ответил» пропускает тихую правку чужого события.
+   */
+  describe('чужие кнопки организатора', () => {
+    const STRANGER = 1600;
+
+    /** Сколько незавершённых черновиков у пользователя: мастер не должен начаться. */
+    const draftsOf = async (userId: number): Promise<number> => {
+      const sessions = await harness.base.deps.sessions.findByUser(userId);
+      return sessions.filter((row) => Boolean((row.value as { draft?: unknown }).draft)).length;
+    };
+
+    const withParticipant = async (userId: number) => {
+      const created = await event();
+      await harness.base.participants.save({
+        event: created,
+        userId,
+        name: 'Аня',
+        username: null,
+        contact: '',
+        status: 'going',
+        answers: {},
+      });
+      return created;
+    };
+
+    it('не открывает меню правок и не начинает правку поля', async () => {
+      const created = await event();
+      harness.clearSent();
+      await harness.click(`ev:edit:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      assert.doesNotMatch(harness.lastText(STRANGER), /Что меняем/, 'участник открыл меню правок');
+
+      await harness.click(`ev:set:${created.code}:title`, { chatId: STRANGER, userId: STRANGER });
+      assert.equal(await draftsOf(STRANGER), 0, 'у участника появился черновик правки');
+    });
+
+    it('не меняет способ ответа на анкету', async () => {
+      const created = await event();
+      await harness.click(`q:set:${created.code}:chat`, { chatId: STRANGER, userId: STRANGER });
+      const stored = await harness.base.events.findByCode(created.code);
+      assert.equal(stored?.answerMode, 'auto', 'участник поменял способ ответа');
+    });
+
+    it('не показывает состав участников', async () => {
+      const created = await event();
+      harness.clearSent();
+      await harness.click(`ev:people:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      assert.match(harness.lastText(STRANGER), /другой организатор/);
+    });
+
+    it('не добавляет позиции в список покупок', async () => {
+      const created = await event();
+      await harness.click(`shop:add:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      assert.equal(await draftsOf(STRANGER), 0, 'участник получил мастер добавления позиций');
+
+      // И следующий текст не должен обрабатываться как позиции.
+      await harness.sendText('Вода', { chatId: STRANGER, userId: STRANGER });
+      assert.deepEqual(await harness.base.items.list(created.id), [], 'участник добавил позиции');
+    });
+
+    it('не рассылает список покупок и не закрывает событие', async () => {
+      const created = await withParticipant(1601);
+
+      harness.clearSent();
+      await harness.click(`shop:notify:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      assert.match(harness.lastText(STRANGER), /только организатор/);
+      assert.deepEqual(
+        harness.sent.filter((message) => message.chatId === 1601),
+        [],
+        'участник разослал список покупок',
+      );
+
+      await harness.click(`ev:close:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      const stored = await harness.base.events.findByCode(created.code);
+      assert.equal(stored?.status, 'published', 'участник закрыл событие');
+    });
+
+    it('не рассылает напоминание участникам', async () => {
+      const created = await withParticipant(1602);
+
+      harness.clearSent();
+      await harness.click(`ev:remind:${created.code}`, { chatId: STRANGER, userId: STRANGER });
+      assert.match(harness.lastText(STRANGER), /другой организатор/);
+      assert.deepEqual(
+        harness.sent.filter((message) => message.chatId === 1602),
+        [],
+        'участник разослал напоминание',
+      );
+    });
+
+    it('не трогает чужой набор вопросов', async () => {
+      const template = await harness.base.templates.createFromFields(1200, 'Мой набор', []);
+
+      await harness.click(`tpl:rename:${template.id}`, { chatId: STRANGER, userId: STRANGER });
+      await harness.sendText('Угнал', { chatId: STRANGER, userId: STRANGER });
+      const renamed = await harness.base.templates.find(template.id, 1200);
+      assert.equal(renamed?.name, 'Мой набор', 'чужой набор переименован');
+
+      await harness.click(`tpl:delok:${template.id}`, { chatId: STRANGER, userId: STRANGER });
+      assert.ok(await harness.base.templates.find(template.id, 1200), 'чужой набор удалён');
+      assert.equal(await draftsOf(STRANGER), 0, 'у участника появился черновик набора');
+    });
   });
 });

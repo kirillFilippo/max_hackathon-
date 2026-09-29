@@ -1,15 +1,20 @@
-import { CB } from '../../callbacks.js';
 import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
-import { cb, withKeyboard } from '../../message.js';
+import { withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
-import { addItemsPrompt, itemPricePrompt, myItems, reserveNumbersPrompt, reserveResult, shoppingList } from '../../texts/shopping.js';
-import { findEventByIdOrNotify, findEventOrNotify, menuRow, userIdOf } from '../helpers.js';
+import { addItemsPrompt, reserveNumbersPrompt, shoppingList } from '../../texts/shopping.js';
+import {
+  findEventByIdOrNotify,
+  findEventOrNotify,
+  isOrganizerOf,
+  menuRow,
+  refuseNotOrganizer,
+  userIdOf,
+} from '../helpers.js';
 import { reserveByNumbersText } from '../features/shopping.js';
 
 export type ItemsAddDraft = Extract<DraftState, { kind: 'items-add' }>;
 export type ItemReserveDraft = Extract<DraftState, { kind: 'item-reserve' }>;
-export type ItemPriceDraft = Extract<DraftState, { kind: 'item-price' }>;
 
 /** Организатор добавляет позиции: одна строка — один предмет. */
 export const startAddItems = async (
@@ -19,8 +24,8 @@ export const startAddItems = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
-  if (event.organizerId !== userIdOf(ctx)) {
-    await show(ctx, withKeyboard('Добавлять позиции может только организатор.', menuRow));
+  if (!isOrganizerOf(ctx, event)) {
+    await refuseNotOrganizer(ctx, 'Добавлять позиции может только организатор.');
     return;
   }
   if (!ctx.session) return;

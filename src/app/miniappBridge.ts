@@ -6,10 +6,10 @@ import type { AppDeps } from '../bot/deps.js';
 import { applyMiniappFields, readDraftQuestionnaire } from '../bot/handlers/miniappSync.js';
 import type { MiniappTicketStore } from '../bot/miniappTickets.js';
 import type { Notifier } from '../bot/notifier.js';
-import { registrationNotice } from '../bot/texts/registration.js';
+import { registrationNotice } from '../bot/texts/registration/index.js';
 import type { AppConfig } from '../config.js';
 import type { Storage } from '../db/storage.js';
-import { formatDateTime } from '../domain/datetime.js';
+import { formatDateTime } from '../domain/datetime/index.js';
 import { STATUS_LABELS } from '../domain/types.js';
 import type { Logger } from '../logger.js';
 import { startMiniappServer, type MiniappHandle } from '../miniapp/server.js';
@@ -45,7 +45,7 @@ export interface MiniappBridgeResult {
 export const startMiniappBridge = async (
   options: MiniappBridgeOptions,
 ): Promise<MiniappBridgeResult> => {
-  const { config, logger, storage, bot, notifier, deps, miniappUrl, tickets, webhookPath, webhookHandler } = options;
+  const { config, logger, storage, notifier, deps, miniappUrl, tickets, webhookPath, webhookHandler } = options;
   const { events, participants, profiles } = deps;
 
   const handle = await startMiniappServer({
@@ -117,9 +117,9 @@ export const startMiniappBridge = async (
       return { ok: true };
     },
     takeTicket: tickets.take,
-    getDraft: (userId) => readDraftQuestionnaire(deps, userId),
-    onFieldsSaved: (userId, fields, answerMode, name) =>
-      applyMiniappFields(deps, userId, fields, answerMode, name),
+    getDraft: (ticket) => readDraftQuestionnaire(deps, ticket),
+    onFieldsSaved: (ticket, fields, answerMode, name) =>
+      applyMiniappFields(deps, ticket, fields, answerMode, name),
   });
 
   return {

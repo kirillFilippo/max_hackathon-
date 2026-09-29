@@ -1,6 +1,6 @@
 import type { AppDeps } from './deps.js';
 import type { ReminderTask } from '../services/reminderService.js';
-import { confirmReminder, finalReminder } from './texts/registration.js';
+import { confirmReminder, finalReminder } from './texts/registration/index.js';
 
 export interface ReminderRunResult {
   confirmSent: number;

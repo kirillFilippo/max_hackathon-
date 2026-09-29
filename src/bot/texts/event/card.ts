@@ -1,15 +1,11 @@
-import { formatDateTime, formatRelative } from '../../../domain/datetime.js';
+import { formatDateTime, formatRelative } from '../../../domain/datetime/index.js';
 import { describeField } from '../../../domain/presets.js';
 import { EFFECTIVE_MODE_LABELS, resolveAnswerMode } from '../../../domain/questionnaire.js';
 import type {
-  AnswerMode,
   DosugEvent,
-  EventField,
   EventStats,
   ItemWithReservation,
   Participant,
-  PlaceCoords,
-  Template,
 } from '../../../domain/types.js';
 import { computeEventStats } from '../../../domain/stats.js';
 import { STATUS_LABELS } from '../../../domain/types.js';
@@ -26,7 +22,9 @@ import {
   cbEventRemind,
   cbRegBegin,
   cbRegChange,
+  cbRegStatus,
   cbShopAdd,
+  cbShopMine,
   cbShopShow,
 } from '../../callbacks.js';
 import {
@@ -41,7 +39,6 @@ import {
   type KeyboardRows,
   type MessageContent,
 } from '../../message.js';
-import type { EventDraftData } from '../../session.js';
 import { type ViewOptions } from './common.js';
 
 export const eventHeadline = (event: DosugEvent, tz: string, now = new Date()): string => {
@@ -173,12 +170,12 @@ export const participantEventCard = (
 
   const rows: KeyboardRows = [
     [
-      cb('Иду', `reg:status:${event.code}:going`),
-      cb('Под вопросом', `reg:status:${event.code}:maybe`),
-      cb('Не смогу', `reg:status:${event.code}:not_going`),
+      cb('Иду', cbRegStatus(event.code, 'going')),
+      cb('Под вопросом', cbRegStatus(event.code, 'maybe')),
+      cb('Не смогу', cbRegStatus(event.code, 'not_going')),
     ],
     itemCount > 0
-      ? [cb('Список покупок', `shop:show:${event.code}`), cb('Мои позиции', `shop:mine:${event.code}`)]
+      ? [cb('Список покупок', cbShopShow(event.code)), cb('Мои позиции', cbShopMine(event.code))]
       : [cb('Доп. информация', cbEventInfo(event.code))],
     [cb('Изменить ответы', cbRegChange(event.code)), cb('К событию', cbEventCard(event.code))],
   ];
@@ -207,7 +204,7 @@ export const invitationCard = (
       : [cb('Записаться', cbRegBegin(event.code))],
     [
       cb('Доп. информация', cbEventInfo(event.code)),
-      cb('Не смогу прийти', `reg:status:${event.code}:not_going`),
+      cb('Не смогу прийти', cbRegStatus(event.code, 'not_going')),
     ],
   ];
   return withKeyboard(lines.join('\n'), rows);

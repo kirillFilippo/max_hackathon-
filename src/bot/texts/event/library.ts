@@ -1,15 +1,6 @@
 import { describeField } from '../../../domain/presets.js';
 import { EFFECTIVE_MODE_LABELS, resolveAnswerMode } from '../../../domain/questionnaire.js';
-import type {
-  AnswerMode,
-  DosugEvent,
-  EventField,
-  EventStats,
-  ItemWithReservation,
-  Participant,
-  PlaceCoords,
-  Template,
-} from '../../../domain/types.js';
+import type { AnswerMode, DosugEvent, EventField, Template } from '../../../domain/types.js';
 import {
   CB,
   cbDraftFieldRemove,
@@ -17,9 +8,12 @@ import {
   cbQuestionsModeShow,
   cbEventCard,
   cbEventEditField,
+  cbTemplateDelete,
+  cbTemplateEdit,
+  cbTemplateRename,
+  cbTemplateUse,
 } from '../../callbacks.js';
 import { cb, truncate, withKeyboard, type KeyboardRows, type MessageContent } from '../../message.js';
-import type { EventDraftData } from '../../session.js';
 import { MAX_EDITOR_FIELDS } from './common.js';
 
 export const fieldsEditor = (
@@ -90,7 +84,7 @@ export const templatesList = (custom: Template[], presets: Template[]): MessageC
 
   const rows: KeyboardRows = custom
     .slice(0, 6)
-    .map((template) => [cb(truncate(template.name, 30), `tpl:use:${template.id}`)]);
+    .map((template) => [cb(truncate(template.name, 30), cbTemplateUse(template.id))]);
   // Набор вопросов можно собрать и из меню, не создавая событие.
   rows.push([cb('Создать набор вопросов', CB.templateNew)]);
   rows.push([cb('В меню', CB.menuMain)]);
@@ -111,8 +105,8 @@ export const templateCard = (template: Template): MessageContent => {
   }
 
   return withKeyboard(lines.join('\n'), [
-    [cb('Изменить вопросы', `tpl:edit:${template.id}`), cb('Переименовать', `tpl:rename:${template.id}`)],
-    [cb('Удалить', `tpl:delete:${template.id}`)],
+    [cb('Изменить вопросы', cbTemplateEdit(template.id)), cb('Переименовать', cbTemplateRename(template.id))],
+    [cb('Удалить', cbTemplateDelete(template.id))],
     [cb('К шаблонам', CB.menuTemplates)],
   ]);
 };

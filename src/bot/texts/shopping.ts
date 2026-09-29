@@ -1,4 +1,4 @@
-import { formatDateTime } from '../../domain/datetime.js';
+import { formatDateTime } from '../../domain/datetime/index.js';
 import type { DosugEvent, ItemWithReservation } from '../../domain/types.js';
 import type { ReserveOutcome } from '../../services/itemService.js';
 import {
@@ -121,17 +121,6 @@ export const reserveNumbersPrompt = (event: DosugEvent, items: ItemWithReservati
       'Если позицию уже кто-то взял, бот скажет кому она досталась и что осталось.',
       '',
       items.map((item, index) => itemLine(item, index, 0)).join('\n'),
-    ].join('\n'),
-    [[cb('Отмена', CB.draftCancel)]],
-  );
-
-export const itemPricePrompt = (item: ItemWithReservation): MessageContent =>
-  withKeyboard(
-    [
-      `Сколько вы заплатили за «${item.title}»?`,
-      '',
-      'Напишите сумму в рублях.',
-      'Если покупка не состоялась, отправьте 0 — позиция освободится.',
     ].join('\n'),
     [[cb('Отмена', CB.draftCancel)]],
   );

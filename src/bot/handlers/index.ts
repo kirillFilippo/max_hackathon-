@@ -5,6 +5,7 @@ import { setEditFailureReporter, show } from '../context.js';
 import type { BotContext } from '../context.js';
 import type { PgSessionStore } from '../../db/sessions.js';
 import type { AppDeps } from '../deps.js';
+import { CB } from '../callbacks.js';
 import { cb, withKeyboard } from '../message.js';
 import type { BotSession } from '../session.js';
 import { UpdateDeduplicator, dedupeMiddleware } from '../middleware/dedupe.js';
@@ -18,7 +19,7 @@ import { handleBotStarted, handleMessage, registerCommands } from './routers/mes
  * 1. session() — подтягивает черновики мастеров из БД;
  * 2. команды — работают даже внутри активного шага (/cancel, /help);
  * 3. handleDraft — перехватывает текст и кнопки активного мастера;
- * 4. остальные события — карточки, покупки, расчёты, FAQ.
+ * 4. остальные события — карточки, покупки, шаблоны, FAQ.
  */
 export const registerHandlers = (
   bot: Bot<BotContext>,
@@ -53,7 +54,7 @@ export const registerHandlers = (
         await show(
           ctx,
           withKeyboard('Не получилось выполнить шаг. Попробуйте ещё раз или начните заново.', [
-            [cb('В меню', 'menu:main')],
+            [cb('В меню', CB.menuMain)],
           ]),
         );
       } catch (secondary) {

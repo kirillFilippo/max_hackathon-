@@ -1,3 +1,4 @@
+import type { MiniappTicket } from '../miniapp/contracts.js';
 import type { SessionsStore } from '../db/storage.js';
 
 /**
@@ -15,10 +16,12 @@ import type { SessionsStore } from '../db/storage.js';
  */
 export const TICKET_TTL_MS = 15 * 60 * 1000;
 
-export interface TicketOwner {
-  userId: number;
-  at: number;
-}
+/**
+ * Пропуск описывается контрактом мини-приложения (`MiniappTicket`): странице нужны
+ * и сессия мастера, и чат. Пропуск без любого из этих полей недействителен —
+ * «угадывать» черновик по пользователю нельзя, у него может быть несколько чатов.
+ */
+export type TicketOwner = MiniappTicket;
 
 export interface MiniappTicketStore {
   register: (ticket: string, owner: TicketOwner) => Promise<void>;
@@ -38,12 +41,23 @@ export const createMiniappTicketStore = (
   // Подпись не гасим: при ошибке проверки организатор может исправить данные
   // и нажать «Сохранить» ещё раз, пока срок не истёк.
   take: async (ticket) => {
-    const stored = (await sessions.get(ticketKey(ticket))) as TicketOwner | undefined;
-    if (!stored || typeof stored.userId !== 'number' || typeof stored.at !== 'number') return null;
+    const stored = (await sessions.get(ticketKey(ticket))) as Partial<TicketOwner> | undefined;
+    if (!stored) return null;
+    // Пропуск без чата или сессии мастера недействителен: такие записи могли
+    // остаться от версии, где черновик искали «первый подходящий у пользователя».
+    if (
+      typeof stored.userId !== 'number'
+      || typeof stored.chatId !== 'number'
+      || typeof stored.sessionKey !== 'string'
+      || typeof stored.at !== 'number'
+    ) {
+      await sessions.delete(ticketKey(ticket));
+      return null;
+    }
     if (Date.now() - stored.at > ttlMs) {
       await sessions.delete(ticketKey(ticket));
       return null;
     }
-    return stored;
+    return stored as TicketOwner;
   },
 });

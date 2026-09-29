@@ -1,8 +1,8 @@
-import { CB } from '../../callbacks.js';
+import { CB, cbTemplateDeleteOk, cbTemplateUse } from '../../callbacks.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
-import { templateCard, templatesList } from '../../texts/event.js';
+import { templateCard, templatesList } from '../../texts/event/index.js';
 import { menuRow, userIdOf } from '../helpers.js';
 
 export const showTemplates = async (ctx: BotContext, deps: AppDeps): Promise<void> => {
@@ -39,7 +39,7 @@ export const confirmDeleteTemplate = async (
     withKeyboard(
       `Удалить шаблон «${template.name}»?\n\nСобытия, созданные с ним, не изменятся.`,
       [
-        [cb('Удалить', `tpl:delok:${template.id}`), cb('Оставить', `tpl:use:${template.id}`)],
+        [cb('Удалить', cbTemplateDeleteOk(template.id)), cb('Оставить', cbTemplateUse(template.id))],
       ],
     ),
   );

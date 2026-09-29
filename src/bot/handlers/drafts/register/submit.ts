@@ -2,13 +2,12 @@ import { STATUS_LABELS, type DosugEvent, type ParticipantStatus } from '../../..
 import { CB, cbEventCard } from '../../../callbacks.js';
 import { replyTo, show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
-import { cb, text, withKeyboard } from '../../../message.js';
-import type { DraftState, RegisterStep } from '../../../session.js';
-import { participantEventCard } from '../../../texts/event.js';
-import { registrationNotice } from '../../../texts/registration.js';
+import { cb, withKeyboard } from '../../../message.js';
+import { participantEventCard } from '../../../texts/event/index.js';
+import { registrationNotice } from '../../../texts/registration/index.js';
 import { eventViewOptions } from '../../features/events.js';
 import { requireUser } from '../../helpers.js';
-import { registerFieldPrompt } from '../../../texts/registration.js';
+import { registerFieldPrompt } from '../../../texts/registration/index.js';
 import type { RegisterDraft } from './screens.js';
 
 export const saveRegistration = async (
@@ -87,5 +86,3 @@ export const saveRegistration = async (
     deps.logger.warn('Не удалось уведомить организатора о новой заявке', error);
   }
 };
-
-/** Старт мастера регистрации: по ссылке-приглашению, коду или кнопке. */

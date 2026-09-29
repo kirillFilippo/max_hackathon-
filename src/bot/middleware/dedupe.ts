@@ -31,8 +31,6 @@ const REPEATABLE_PAYLOADS: RegExp[] = [
   /^ev:people:/,
   /^shop:show/,
   /^shop:mine/,
-  /^money:show/,
-  /^tq:refresh/,
 ];
 
 export const isRepeatableAction = (payload: string): boolean =>

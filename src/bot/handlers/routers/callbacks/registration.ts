@@ -7,7 +7,7 @@ import {
   confirmRegistrationButton,
   quickStatusChange,
   startEditRegistration,
-} from '../../drafts/register.js';
+} from '../../drafts/register/index.js';
 import { menuRow } from '../../helpers.js';
 
 

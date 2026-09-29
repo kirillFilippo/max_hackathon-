@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { renderAnswerPageHtml } from './answerPage.js';
 import type { ParticipantStatus } from '../domain/types.js';
-import type { MiniappDeps, MiniappTicket } from './contracts.js';
+import type { MiniappDeps } from './contracts.js';
 import { json, readBody } from './http.js';
 import { identify } from './identity.js';
 import { renderMiniappHtml } from './questionsPage.js';
@@ -43,7 +43,7 @@ export const handleMiniappRequest = async (
       json(res, 403, { error: 'Ссылка конструктора устарела. Откройте её заново из чата с ботом.' });
       return;
     }
-    const draft = await deps.getDraft(ticket.userId);
+    const draft = await deps.getDraft(ticket);
     if (!draft) {
       json(res, 404, { error: 'Черновик не найден. Откройте конструктор из мастера создания события.' });
       return;
@@ -166,7 +166,7 @@ export const handleMiniappRequest = async (
     const name = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 60) : '';
     try {
       // Подпись не гасим: организатор может сохранить ещё раз, пока она жива.
-      await deps.onFieldsSaved(ticket.userId, fields, answerMode, name);
+      await deps.onFieldsSaved(ticket, fields, answerMode, name);
     } catch (saveError) {
       deps.logger.error('Не удалось сохранить вопросы из мини-приложения', saveError);
       json(res, 500, { error: 'Не удалось сохранить вопросы, попробуйте ещё раз' });

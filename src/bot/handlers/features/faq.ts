@@ -1,4 +1,5 @@
-import { answerFaq, FAQ_ITEMS, matchFaq, type FaqContext } from '../../../services/faqService.js';
+import { FAQ_ITEMS } from '../../../domain/faq.js';
+import { answerFaq, matchFaq, type FaqContext } from '../../../services/faqService.js';
 import { CB, cbFaqEvent, cbFaqQuestion } from '../../callbacks.js';
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';

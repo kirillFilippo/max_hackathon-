@@ -7,9 +7,10 @@ import { cb, withKeyboard } from '../../message.js';
 import { listReadyNotification, myItems, reserveResult, shoppingList } from '../../texts/shopping.js';
 import {
   findEventOrNotify,
-  menuRow,
+  isOrganizerOf,
   notifyParticipants,
   participantNameFor,
+  refuseNotOrganizer,
   requireUser,
   userIdOf,
 } from '../helpers.js';
@@ -30,7 +31,7 @@ export const showShoppingList = async (
   const items = await deps.items.list(event.id);
   await show(
     ctx,
-    shoppingList(event, items, { isOrganizer: event.organizerId === userIdOf(ctx), userId: userIdOf(ctx) }),
+    shoppingList(event, items, { isOrganizer: isOrganizerOf(ctx, event), userId: userIdOf(ctx) }),
   );
 };
 
@@ -132,8 +133,8 @@ export const notifyShoppingList = async (
 ): Promise<void> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return;
-  if (event.organizerId !== userIdOf(ctx)) {
-    await show(ctx, withKeyboard('Рассылать список может только организатор.', menuRow));
+  if (!isOrganizerOf(ctx, event)) {
+    await refuseNotOrganizer(ctx, 'Рассылать список может только организатор.');
     return;
   }
   const items = await deps.items.list(event.id);

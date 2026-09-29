@@ -1,7 +1,15 @@
 /**
  * Единая схема callback-данных кнопок: короткий payload из «действие + аргументы».
- * Идентификаторы (коды событий, item_id, request_id) не содержат двоеточий, поэтому
- * разбор через split(':') однозначен.
+ *
+ * Разбор идёт через `split(':')`, поэтому идентификаторы (коды событий, `item_id`,
+ * `fld_…`, `tpl_…`) двоеточий не содержат. Единственное исключение — предустановленные
+ * наборы вопросов: их id выглядит как `preset:<ключ>`. Роутеры наборов склеивают
+ * остаток аргументов обратно через `args.slice(1).join(':')` (`callbacks/templates.ts`,
+ * `drafts/createEvent/wizard.ts`), поэтому склеивание там не упрощать.
+ *
+ * Собирать payload'ы можно только здесь: литералы по коду ловит
+ * `test/architecture.test.ts`, а форматы уже уехали в отправленные сообщения,
+ * поэтому менять их нельзя — только добавлять новые.
  */
 
 export const CB = {
@@ -13,13 +21,8 @@ export const CB = {
   menuProfile: 'menu:profile',
 
   eventNew: 'ev:new',
-  eventList: 'ev:list',
 
   shopShow: 'shop:show',
-  questionsApp: 'app:questions',
-  questionsMode: 'q:mode',
-  shopAdd: 'shop:add',
-  shopReserve: 'shop:reserve',
   shopMine: 'shop:mine',
 
   profileContact: 'profile:contact',
@@ -36,7 +39,6 @@ export const CB = {
   draftPlaceOk: 'draft:place:ok',
   draftPlaceRetry: 'draft:place:retry',
 
-  regConfirm: 'reg:confirm',
   regCancel: 'reg:cancel',
   regNameSelf: 'reg:name:self',
   regContactSkip: 'reg:contact:skip',

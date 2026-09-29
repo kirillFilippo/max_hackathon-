@@ -4,9 +4,9 @@ import { eventCodeFromStartPayload, startCommandPayload } from '../../../domain/
 import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cb, withKeyboard } from '../../message.js';
-import { fallback, helpText, mainMenu } from '../../texts/common.js';
-import { startCreateEvent } from '../drafts/createEvent.js';
-import { startRegistration } from '../drafts/register.js';
+import { fallback, helpText } from '../../texts/common.js';
+import { startCreateEvent } from '../drafts/createEvent/index.js';
+import { startRegistration } from '../drafts/register/index.js';
 import { debugCreateEvent, debugReceiveEvent, DEBUG_CREATE_COMMAND, DEBUG_RECEIVE_COMMAND } from '../features/debug.js';
 import { showEventList, showMainMenu } from '../features/events.js';
 import { tryAnswerFaqText } from '../features/faq.js';
@@ -171,5 +171,3 @@ export const registerCommands = (bot: import('@maxhub/max-bot-api').Bot<BotConte
     );
   }));
 };
-
-export { mainMenu };

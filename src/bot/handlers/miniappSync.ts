@@ -1,17 +1,18 @@
 import { newFieldId } from '../../domain/ids.js';
 import { normalizeField } from '../../domain/questionnaire.js';
 import type { AnswerMode, EventField } from '../../domain/types.js';
-import type { MiniappField } from '../../miniapp/server.js';
+import type { MiniappField, MiniappTicket } from '../../miniapp/server.js';
 import type { BotSession } from '../session.js';
 import type { AppDeps } from '../deps.js';
-import { fieldsEditor, templateFieldsEditor } from '../texts/event.js';
+import { fieldsEditor, templateFieldsEditor } from '../texts/event/index.js';
 
 /**
  * Связка «мини-приложение → черновик мастера».
  *
- * Конструктор вопросов живёт в отдельном процессе-странице и не знает, в каком
- * чате открыт мастер: он присылает вопросы с одноразовой подписью, а мы находим
- * активный черновик организатора, обновляем его и присылаем в чат новый экран.
+ * Конструктор вопросов живёт отдельной страницей и не знает, в каком чате открыт
+ * мастер. Он присылает вопросы с одноразовым пропуском, в котором записано, кто и
+ * из какой сессии его открыл: по сессии находим нужный черновик (у пользователя их
+ * может быть несколько — по одному на чат), а по чату возвращаем экран обратно.
  */
 export type QuestionDraft = Extract<
   NonNullable<BotSession['draft']>,
@@ -21,15 +22,20 @@ export type QuestionDraft = Extract<
 const isQuestionDraft = (draft: BotSession['draft']): draft is QuestionDraft =>
   Boolean(draft && (draft.kind === 'create-event' || draft.kind === 'edit-template' || draft.kind === 'new-template'));
 
-/** Активные черновики вопросов пользователя: событие, набор или правка набора. */
-export const activeQuestionDrafts = async (
+/**
+ * Черновик вопросов из сессии пропуска.
+ *
+ * Сессию берём по ключу напрямую: пропуск выдан из конкретного чата, поэтому
+ * перебирать все сессии пользователя не нужно и нельзя — иначе вопросы уехали бы
+ * в чужой черновик.
+ */
+const findQuestionDraft = async (
   deps: AppDeps,
-  userId: number,
-): Promise<Array<{ key: string; draft: QuestionDraft }>> => {
-  const sessions = await deps.sessions.findByUser(userId);
-  return sessions
-    .map(({ key, value }) => ({ key, draft: value.draft }))
-    .filter((entry): entry is { key: string; draft: QuestionDraft } => isQuestionDraft(entry.draft));
+  ticket: MiniappTicket,
+): Promise<{ key: string; draft: QuestionDraft } | null> => {
+  const session = await deps.sessions.get(ticket.sessionKey);
+  const draft = session?.draft;
+  return isQuestionDraft(draft) ? { key: ticket.sessionKey, draft } : null;
 };
 
 export interface DraftQuestionnaire {
@@ -54,9 +60,9 @@ const toMiniappField = (field: EventField): MiniappField => ({
 /** Что показать в конструкторе: текущие вопросы, режим ответа и название набора. */
 export const readDraftQuestionnaire = async (
   deps: AppDeps,
-  userId: number,
+  ticket: MiniappTicket,
 ): Promise<DraftQuestionnaire | null> => {
-  const [entry] = await activeQuestionDrafts(deps, userId);
+  const entry = await findQuestionDraft(deps, ticket);
   if (!entry) return null;
   const { draft } = entry;
   const data = draft.kind === 'create-event' ? draft.data : undefined;
@@ -73,14 +79,16 @@ export const readDraftQuestionnaire = async (
  */
 export const applyMiniappFields = async (
   deps: AppDeps,
-  userId: number,
+  ticket: MiniappTicket,
   fields: MiniappField[],
   answerMode: AnswerMode,
   name = '',
 ): Promise<void> => {
-  const [entry] = await activeQuestionDrafts(deps, userId);
+  const entry = await findQuestionDraft(deps, ticket);
   if (!entry) {
-    deps.logger.warn(`Черновик вопросов не найден (пользователь ${userId}) — вопросы из приложения не сохранены`);
+    deps.logger.warn(
+      `Черновик вопросов не найден (сессия ${ticket.sessionKey}) — вопросы из приложения не сохранены`,
+    );
     throw new Error('Черновик вопросов не найден');
   }
 
@@ -101,19 +109,20 @@ export const applyMiniappFields = async (
   const session = await deps.sessions.get(key);
   await deps.sessions.set(key, { ...(session ?? {}), draft: draft as BotSession['draft'] });
 
-  const chatId = Number(key.split(':')[1]);
-  if (Number.isFinite(chatId)) {
-    // Событие и набор вопросов показывают разные экраны: у набора нет способа ответа,
-    // а «Готово» мастера события сохранило бы набор не тем действием.
-    const content = draft.kind === 'create-event'
-      ? fieldsEditor(draft.fields, answerMode)
-      : templateFieldsEditor(draft.name ?? '', draft.fields);
-    try {
-      await deps.notifier.sendToUser(chatId, content);
-    } catch (error) {
-      deps.logger.warn(`Не удалось обновить экран вопросов в чате ${chatId}`, error);
-    }
+  // Событие и набор вопросов показывают разные экраны: у набора нет способа ответа,
+  // а «Готово» мастера события сохранило бы набор не тем действием.
+  const content = draft.kind === 'create-event'
+    ? fieldsEditor(draft.fields, answerMode)
+    : templateFieldsEditor(draft.name ?? '', draft.fields);
+  try {
+    // Чат берём из пропуска: в личном диалоге MAX он совпадает с пользователем,
+    // но полагаться на это нельзя — сообщение адресуется чату.
+    await deps.notifier.sendToChat(ticket.chatId, content);
+  } catch (error) {
+    deps.logger.warn(`Не удалось обновить экран вопросов в чате ${ticket.chatId}`, error);
   }
 
-  deps.logger.info(`Вопросы из мини-приложения сохранены (пользователь ${userId}, вопросов ${fields.length})`);
+  deps.logger.info(
+    `Вопросы из мини-приложения сохранены (пользователь ${ticket.userId}, вопросов ${fields.length})`,
+  );
 };

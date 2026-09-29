@@ -1,9 +1,8 @@
-import type { DraftState } from '../../../session.js';
-import { cbEventLink } from '../../../callbacks.js';
+import { cbEventCard, cbEventLink } from '../../../callbacks.js';
 import { replyTo, show, type BotContext } from '../../../context.js';
 import type { AppDeps } from '../../../deps.js';
 import { cb, withKeyboard } from '../../../message.js';
-import { organizerEventCard } from '../../../texts/event.js';
+import { organizerEventCard } from '../../../texts/event/index.js';
 import { eventViewOptions } from '../../features/events.js';
 import { botUsernameOf, menuRow } from '../../helpers.js';
 
@@ -55,7 +54,7 @@ export const publish = async (ctx: BotContext, deps: AppDeps, draft: CreateEvent
         )
       : withKeyboard(
           `Событие создано. Код для участников: ${event.code}. Пусть отправят боту /join ${event.code}.`,
-          [[cb('К событию', `ev:card:${event.code}`)]],
+          [[cb('К событию', cbEventCard(event.code))]],
         ),
   );
 };

@@ -1,10 +1,10 @@
-import { CB, parseCallback } from '../../callbacks.js';
+import { CB } from '../../callbacks.js';
 import { show, userText, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import { cancelRow, cb, withKeyboard } from '../../message.js';
 import type { DraftState } from '../../session.js';
 import { cbQuestionsApp } from '../../callbacks.js';
-import { templateCard, templateFieldsEditor } from '../../texts/event.js';
+import { templateCard, templateFieldsEditor } from '../../texts/event/index.js';
 import { handleFieldsScreenInput } from './fieldsScreen.js';
 import { menuRow, userIdOf } from '../helpers.js';
 import { callbackArgs } from './fieldsScreen.js';

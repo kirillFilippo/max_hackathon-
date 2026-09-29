@@ -124,7 +124,7 @@ export const startHarness = async (overrides: Partial<AppConfig> = {}): Promise<
   const items = new ItemService(repos);
   const templates = new TemplateService(repos);
   const reminders = new ReminderService(repos, config);
-  const debug = new DebugService({ events, participants, items }, config);
+  const debug = new DebugService({ events, participants, items });
   const sessionStore = new PgSessionStore<BotSession>(db, config.sessionTtlHours * 3_600_000);
   const notifier = makeFakeNotifier();
 

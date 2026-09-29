@@ -2,6 +2,7 @@ import { show, type BotContext } from '../../context.js';
 import type { AppDeps } from '../../deps.js';
 import type { DebugScenario } from '../../../services/debugService.js';
 import { cb, withKeyboard } from '../../message.js';
+import { cbEventCard, cbShopShow } from '../../callbacks.js';
 import { menuRow, requireUser } from '../helpers.js';
 import { openEventForParticipant, showEventCard } from './events.js';
 import { isGoing } from '../../../domain/stats.js';
@@ -10,7 +11,7 @@ import { isGoing } from '../../../domain/stats.js';
  * Отладочные команды: быстро получить событие с людьми.
  *
  * `/debugcreateevent` — создаёт событие от имени вызывающего и наполняет его
- * синтетическими участниками, ответами, списком покупок и суммами.
+ * синтетическими участниками, ответами и списком покупок.
  * `/debugreceiveevent` — создаёт событие «чужого» организатора и записывает
  * вызывающего участником: видно путь участника, а не организатора.
  *
@@ -58,7 +59,7 @@ export const debugCreateEvent = async (ctx: BotContext, deps: AppDeps): Promise<
         scenarioSummary(scenario),
         `Код события: ${scenario.event.code}.`,
       ].filter(Boolean).join('\n'),
-      [[cb('Открыть карточку', `ev:card:${scenario.event.code}`)], ...menuRow],
+      [[cb('Открыть карточку', cbEventCard(scenario.event.code))], ...menuRow],
     ),
   );
   await showEventCard(ctx, deps, scenario.event.code);
@@ -87,8 +88,8 @@ export const debugReceiveEvent = async (ctx: BotContext, deps: AppDeps): Promise
         'Заявка в статусе «под вопросом» — подтвердите участие кнопками в карточке.',
       ].join('\n'),
       [
-        [cb('Моя карточка', `ev:card:${scenario.event.code}`)],
-        [cb('Список покупок', `shop:show:${scenario.event.code}`)],
+        [cb('Моя карточка', cbEventCard(scenario.event.code))],
+        [cb('Список покупок', cbShopShow(scenario.event.code))],
         ...menuRow,
       ],
     ),

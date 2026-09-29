@@ -10,25 +10,15 @@
  * вариантами, ограничениями ответа и обязательностью, а также способ ответа
  * участников.
  */
+import { finishJs, notifyJs, pageHead, redirectJs, startParamJs, webAppReadyJs } from './pageShell.js';
+
 export const MINIAPP_MAX_FIELDS = 10;
 export const MINIAPP_MAX_OPTIONS = 12;
 export const MINIAPP_MAX_LABEL = 140;
 export const MINIAPP_MAX_NAME = 60;
 export const MINIAPP_CHAT_WEIGHT_LIMIT = 10;
 
-/** Код подписи мастера: кладём в сессию, чтобы конструктор мог записать результат. */
-export interface MiniappTicket {
-  userId: number;
-  at: number;
-}
-
-export const renderMiniappHtml = (options: { title: string }): string => `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${options.title}</title>
-<script src="https://st.max.ru/js/max-web-app.js"></script>
+export const renderMiniappHtml = (options: { title: string }): string => `${pageHead({ title: options.title })}
 <style>
   :root { --ink:#14181f; --muted:#5b6673; --line:#d7dde5; --accent:#1f6feb; --bg:#f4f6fa; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -104,32 +94,13 @@ const MAX_OPTIONS = ${MINIAPP_MAX_OPTIONS};
 const CHAT_LIMIT = ${MINIAPP_CHAT_WEIGHT_LIMIT};
 const TYPES = [['text','Текст'],['number','Число'],['choice','Выбор из вариантов'],['yesno','Да / Нет'],['date','Дата']];
 
-/** Стартовый параметр мини-приложения: мост MAX или фрагмент ссылки. */
-const readStartParam = () => {
-  try {
-    const fromBridge = window.WebApp && window.WebApp.initDataUnsafe && window.WebApp.initDataUnsafe.start_param;
-    if (fromBridge) return String(fromBridge);
-  } catch (error) { /* мост мог не подняться */ }
-  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-  return fragment.get('WebAppStartParam') || '';
-};
+${startParamJs()}
 
-const startParam = readStartParam();
-
-// Мини-приложение открыто — сообщаем об этом MAX, иначе вебвью может остаться
-// на экране загрузки. Вне MAX моста нет: страница работает как обычный сайт.
-try {
-  if (window.WebApp) {
-    window.WebApp.ready();
-    if (window.WebApp.expand) window.WebApp.expand();
-  }
-} catch (error) { /* не критично */ }
+${webAppReadyJs()}
 
 // Анкету участника и конструктор обслуживает одно мини-приложение: если открыли
 // анкету (start_param вида ev_...), уходим на её страницу.
-if (startParam.startsWith('ev_')) {
-  location.replace('/app/answer' + location.hash);
-}
+${redirectJs('ev_', "'/app/answer'")}
 
 // Подпись мастера приходит либо прямой ссылкой (?t=), либо через start_param.
 const ticket = (() => {
@@ -137,7 +108,6 @@ const ticket = (() => {
   if (fromQuery) return fromQuery;
   return startParam.startsWith('tpl_') ? startParam.slice(4) : '';
 })();
-const noticeEl = document.getElementById('notice');
 const listEl = document.getElementById('list');
 const nameEl = document.getElementById('name');
 const weightEl = document.getElementById('weight');
@@ -145,11 +115,7 @@ const weightEl = document.getElementById('weight');
 let fields = [];
 let answerMode = 'auto';
 
-const notify = (text) => {
-  noticeEl.textContent = text;
-  noticeEl.classList.add('show');
-  setTimeout(() => noticeEl.classList.remove('show'), 2400);
-};
+${notifyJs(2400)}
 
 const blankField = () => ({
   label: '', type: 'text', options: [], multiple: false,
@@ -329,22 +295,7 @@ document.getElementById('add').onclick = () => {
 };
 
 // Финальный экран: внутри MAX можно сразу закрыть приложение и вернуться в чат.
-const finish = (text) => {
-  document.body.innerHTML = '';
-  const box = document.createElement('div');
-  box.className = 'done';
-  box.textContent = text;
-  document.body.appendChild(box);
-  try {
-    if (window.WebApp && window.WebApp.close) {
-      const back = document.createElement('button');
-      back.className = 'primary';
-      back.textContent = 'Вернуться в чат';
-      back.onclick = () => window.WebApp.close();
-      box.appendChild(back);
-    }
-  } catch (error) { /* вне MAX кнопка не нужна */ }
-};
+${finishJs()}
 
 const cleanFields = () => fields
   .map((f) => ({

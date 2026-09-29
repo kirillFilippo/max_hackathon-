@@ -6,13 +6,9 @@
  * Страница показывает все вопросы сразу, проверяет ввод по ограничениям и
  * отправляет ответы на сервер бота вместе с подписью запуска (initData).
  */
-export const renderAnswerPageHtml = (options: { title: string }): string => `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${options.title}</title>
-<script src="https://st.max.ru/js/max-web-app.js"></script>
+import { finishJs, initDataJs, notifyJs, pageHead, redirectJs, startParamJs, webAppReadyJs } from './pageShell.js';
+
+export const renderAnswerPageHtml = (options: { title: string }): string => `${pageHead({ title: options.title })}
 <style>
   :root { --ink:#14181f; --muted:#5b6673; --line:#d7dde5; --accent:#1f6feb; --bg:#f4f6fa; --danger:#b4232c; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -60,7 +56,6 @@ export const renderAnswerPageHtml = (options: { title: string }): string => `<!D
 const params = new URLSearchParams(location.search);
 const codeFromUrl = params.get('code') || params.get('event') || '';
 const devUserId = params.get('devUserId');
-const statusEl = document.getElementById('notice');
 const fieldsEl = document.getElementById('fields');
 const eventEl = document.getElementById('event');
 const statusesEl = document.getElementById('statuses');
@@ -69,61 +64,20 @@ let event = null;
 let fields = [];
 let me = { name: '', contact: '', status: 'going', answers: {} };
 
-const notify = (text) => {
-  statusEl.textContent = text;
-  statusEl.classList.add('show');
-  setTimeout(() => statusEl.classList.remove('show'), 2600);
-};
+${notifyJs(2600)}
 
 // Финальный экран: если открыто внутри MAX — можно сразу вернуться в чат.
-const finish = (text) => {
-  document.body.innerHTML = '';
-  const box = document.createElement('div');
-  box.className = 'done';
-  box.textContent = text;
-  document.body.appendChild(box);
-  try {
-    if (window.WebApp && window.WebApp.close) {
-      const back = document.createElement('button');
-      back.className = 'primary';
-      back.textContent = 'Вернуться в чат';
-      back.onclick = () => window.WebApp.close();
-      box.appendChild(back);
-    }
-  } catch (error) { /* вне MAX кнопка не нужна */ }
-};
+${finishJs()}
 
-const initData = () => {
-  try {
-    return (window.WebApp && window.WebApp.initData) || '';
-  } catch (error) {
-    return '';
-  }
-};
+${initDataJs()}
 
-// Мини-приложение открыто — говорим об этом MAX, иначе вебвью может так и
-// остаться на экране загрузки.
-try {
-  if (window.WebApp) {
-    window.WebApp.ready();
-    if (window.WebApp.expand) window.WebApp.expand();
-  }
-} catch (error) { /* открыто вне MAX — работаем как обычная страница */ }
+${webAppReadyJs()}
 
-const startParam = (() => {
-  try {
-    const fromBridge = window.WebApp && window.WebApp.initDataUnsafe && window.WebApp.initDataUnsafe.start_param;
-    if (fromBridge) return String(fromBridge);
-  } catch (error) { /* мост мог не подняться */ }
-  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-  return fragment.get('WebAppStartParam') || codeFromUrl || '';
-})();
+${startParamJs('codeFromUrl')}
 
 // Конструктор вопросов живёт на этой же странице мини-приложения: разводим их
 // по стартовому параметру, чтобы организатор попадал в конструктор, а не в анкету.
-if (startParam.startsWith('tpl_')) {
-  location.replace('/app/questions?t=' + encodeURIComponent(startParam.slice(4)) + location.hash);
-}
+${redirectJs('tpl_', "'/app/questions?t=' + encodeURIComponent(startParam.slice(4))")}
 
 const code = (() => {
   const value = startParam || '';

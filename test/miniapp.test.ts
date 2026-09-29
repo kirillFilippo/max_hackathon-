@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { startMiniappServer, type MiniappField, type MiniappHandle } from '../src/miniapp/server.js';
+import { startMiniappServer, type MiniappField, type MiniappHandle, type MiniappTicket } from '../src/miniapp/server.js';
 import { newTicket } from '../src/miniapp/server.js';
 import { MINIAPP_CHAT_WEIGHT_LIMIT, MINIAPP_MAX_FIELDS } from '../src/miniapp/questionsPage.js';
 import type { AnswerMode } from '../src/domain/types.js';
@@ -11,7 +11,7 @@ import { createLogger } from '../src/logger.js';
 import { validateInitData } from '../src/miniapp/auth.js';
 
 interface SavedPayload {
-  userId: number;
+  ticket: MiniappTicket;
   fields: MiniappField[];
   answerMode: AnswerMode;
   name: string;
@@ -34,6 +34,8 @@ const draftFields: MiniappField[] = [
 
 let handle: MiniappHandle;
 let saved: SavedPayload[] = [];
+/** Чем конструктор запрашивал черновик: проверяем, что пропуск доезжает целиком. */
+const draftedFor: MiniappTicket[] = [];
 const savedAnswers: Array<{ code: string; userId: number }> = [];
 const validTickets = new Map<string, number>();
 
@@ -44,9 +46,12 @@ before(async () => {
     port: 0,
     botToken: 'test-bot-token',
     devMode: true,
-    getDraft: async (userId) => (userId === 7
-      ? { fields: draftFields, answerMode: 'chat', name: 'Настольная игра' }
-      : null),
+    getDraft: async (ticket) => {
+      draftedFor.push(ticket);
+      return ticket.userId === 7
+        ? { fields: draftFields, answerMode: 'chat', name: 'Настольная игра' }
+        : null;
+    },
     getQuestionnaire: async (code) => (code === 'ABC12'
       ? {
           event: { code: 'ABC12', title: 'Настолки', startsAt: '25 октября 2026, 19:00', place: 'Кубик' },
@@ -61,10 +66,12 @@ before(async () => {
     takeTicket: async (ticket) => {
       const at = validTickets.get(ticket);
       if (at === undefined) return null;
-      return { userId: 7, at };
+      // Чат и сессия мастера — часть пропуска: без них конструктор не знает,
+      // какой черновик править и куда вернуть обновлённый экран.
+      return { userId: 7, chatId: 42, sessionKey: '7:42', at };
     },
-    onFieldsSaved: async (userId, fields, answerMode, name) => {
-      saved.push({ userId, fields, answerMode, name });
+    onFieldsSaved: async (ticket, fields, answerMode, name) => {
+      saved.push({ ticket, fields, answerMode, name });
     },
   });
 });
@@ -148,9 +155,11 @@ describe('Мини-приложение конструктора вопросо�
     assert.equal(status, 200);
     assert.equal(data.ok, true);
     assert.equal(saved.length, 1);
-    assert.equal(saved[0]?.userId, 7);
+    assert.equal(saved[0]?.ticket.userId, 7);
     assert.equal(saved[0]?.answerMode, 'miniapp');
     assert.equal(saved[0]?.name, 'Поход в леса');
+    // Ключ сессии из подписи доезжает до сохранения: правка идёт в свой черновик.
+    assert.equal(saved[0]?.ticket.sessionKey, '7:42');
 
     const fields = saved[0]!.fields;
     assert.equal(fields.length, 4);
@@ -207,6 +216,8 @@ describe('Мини-приложение конструктора вопросо�
     assert.equal(data.fields?.[0]?.label, 'Возраст');
     assert.equal(data.answerMode, 'chat');
     assert.equal(data.name, 'Настольная игра');
+    assert.equal(draftedFor.at(-1)?.sessionKey, '7:42', 'ключ сессии не передан в getDraft');
+    assert.equal(draftedFor.at(-1)?.chatId, 42, 'чат не передан в getDraft');
 
     const stale = await fetch(`http://127.0.0.1:${handle.port}/app/draft?t=unknown`);
     assert.equal(stale.status, 403);

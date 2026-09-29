@@ -1,4 +1,3 @@
-import type { AppConfig } from '../config.js';
 import { isSyntheticUserId, syntheticUserId } from '../domain/ids.js';
 import { PRESET_TEMPLATES, fieldsFromPreset } from '../domain/presets.js';
 import type {
@@ -14,7 +13,7 @@ import type { ParticipantService } from './participantService.js';
 
 /**
  * Отладочные события: наполняют бота данными за один вызов, чтобы проверять
- * карточки, панель организатора, список покупок и расчёты без второго аккаунта
+ * карточки, панель организатора и список покупок без второго аккаунта
  * и без ручного ввода десяти заявок.
  *
  * Сервис не работает с репозиториями напрямую: он собирает событие из обычных
@@ -104,12 +103,9 @@ export const demoAnswer = (field: EventField, index: number): string => {
 };
 
 export class DebugService {
-  constructor(
-    private readonly services: DebugServices,
-    private readonly config: AppConfig,
-  ) {}
+  constructor(private readonly services: DebugServices) {}
 
-  /** Событие организатора: полный стол, лист ожидания, покупки и суммы. */
+  /** Событие организатора: полный стол, лист ожидания и покупки. */
   async createFilledEvent(organizer: DebugPerson): Promise<DebugScenario> {
     const event = await this.createEvent(organizer, {
       title: 'Отладка: настольная игра',
@@ -122,7 +118,7 @@ export class DebugService {
   async createEventForParticipant(user: DebugPerson): Promise<DebugScenario> {
     const event = await this.createEvent(DEMO_ORGANIZER, {
       title: 'Отладка: меня пригласили',
-      description: 'Тестовое событие, чтобы пройти путь участника: заявка, покупки, расчёты.',
+      description: 'Тестовое событие, чтобы пройти путь участника: заявка и покупки.',
     });
 
     // Одного «идущего» не добавляем: место в основном составе остаётся вызывающему.
@@ -162,7 +158,7 @@ export class DebugService {
     });
   }
 
-  /** Люди, ответы, список покупок, брони и суммы. */
+  /** Люди, ответы, список покупок и брони. */
   private async fill(
     event: DosugEvent,
     options: { skipGoingSlots?: number } = {},

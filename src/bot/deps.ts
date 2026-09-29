@@ -9,8 +9,7 @@ import type { ProfileService } from '../services/profileService.js';
 import type { ReminderService } from '../services/reminderService.js';
 import type { TemplateService } from '../services/templateService.js';
 import type { PgSessionStore } from '../db/sessions.js';
-import type { AnswerMode } from '../domain/types.js';
-import type { MiniappField } from '../miniapp/server.js';
+import type { MiniappTicket } from '../miniapp/contracts.js';
 import type { BotSession } from './session.js';
 import type { Notifier } from './notifier.js';
 
@@ -39,6 +38,6 @@ export interface MiniappBridge {
   /** Ссылка на конструктор: только одноразовая подпись, черновик страница берёт сама. */
   buildUrl: (ticket: string) => string;
   /** Подпись конструктора живёт в хранилище сессий: рестарт бота её не теряет. */
-  registerTicket: (ticket: string, owner: { userId: number; at: number }) => Promise<void>;
-  takeTicket: (ticket: string) => Promise<{ userId: number; at: number } | null>;
+  registerTicket: (ticket: string, owner: MiniappTicket) => Promise<void>;
+  takeTicket: (ticket: string) => Promise<MiniappTicket | null>;
 }

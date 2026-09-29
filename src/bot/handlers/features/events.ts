@@ -12,13 +12,15 @@ import {
   organizerEventCard,
   participantEventCard,
   participantsPanel,
-} from '../../texts/event.js';
-import { confirmReminder } from '../../texts/registration.js';
+} from '../../texts/event/index.js';
+import { confirmReminder } from '../../texts/registration/index.js';
 import {
   botUsernameOf,
   findEventOrNotify,
-  menuRow,
+  isOrganizerOf,
+  NOT_ORGANIZER,
   notifyParticipants,
+  refuseNotOrganizer,
   requireUser,
   userIdOf,
 } from '../helpers.js';
@@ -39,18 +41,38 @@ export const showEventList = async (ctx: BotContext, deps: AppDeps): Promise<voi
   await show(ctx, eventListView(events, eventViewOptions(ctx, deps)));
 };
 
-const requireOwnEvent = async (
+/**
+ * Пропускает только организатора события; остальным показывает отказ.
+ * Используется теми кнопками, где действие меняет состояние: правка, состав,
+ * напоминания, рассылка списка.
+ */
+export const requireOwnEvent = async (
+  ctx: BotContext,
+  deps: AppDeps,
+  code: string,
+  message: string = NOT_ORGANIZER,
+): Promise<DosugEvent | null> => {
+  const event = await findEventOrNotify(ctx, deps, code);
+  if (!event) return null;
+  if (isOrganizerOf(ctx, event)) return event;
+  await refuseNotOrganizer(ctx, message);
+  return null;
+};
+
+/**
+ * То же, но для кнопок «К событию»: участник попал сюда из своего интерфейса,
+ * поэтому вместо отказа показываем его карточку — с заявкой и статусом.
+ */
+export const requireOwnEventOrCard = async (
   ctx: BotContext,
   deps: AppDeps,
   code: string,
 ): Promise<DosugEvent | null> => {
   const event = await findEventOrNotify(ctx, deps, code);
   if (!event) return null;
-  if (event.organizerId !== userIdOf(ctx)) {
-    await show(ctx, withKeyboard('Это событие создал другой организатор, управлять им нельзя.', menuRow));
-    return null;
-  }
-  return event;
+  if (isOrganizerOf(ctx, event)) return event;
+  await openEventForParticipant(ctx, deps, code);
+  return null;
 };
 
 export const showEventCard = async (

@@ -1,7 +1,6 @@
 /**
  * Редактор вопроса: экраны и кнопки (`screens`) и шаги с сохранением поля
- * (`steps`). Наружу всё отдаётся через этот файл, поэтому импорты
- * `drafts/editor.js` не меняются.
+ * (`steps`). Единственная точка входа — `drafts/editor/index.js`.
  */
 export * from './screens.js';
 export * from './steps.js';
