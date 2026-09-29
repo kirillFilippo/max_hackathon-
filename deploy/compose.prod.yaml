@@ -49,7 +49,6 @@ services:
       # Значения по умолчанию — чтобы файл был самодостаточным: реальные
       # параметры базы всё равно приходят из ../.env.
       DATABASE_URL: postgres://${POSTGRES_USER:-dosug}:${POSTGRES_PASSWORD:-dosug}@postgres:5432/${POSTGRES_DB:-dosug}
-      DATA_DIR: /app/data
       MINIAPP_PORT: "8090"
       # Сертификат MAX (Russian Trusted Root CA) уже внутри образа:
       # NODE_EXTRA_CA_CERTS задан в Dockerfile, монтировать ничего не нужно.
