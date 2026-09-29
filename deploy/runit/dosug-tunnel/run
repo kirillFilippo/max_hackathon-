@@ -6,7 +6,7 @@
 exec 2>&1
 
 if [ ! -f /home/user/.ssh/vps_tunnel ]; then
-  echo "нет ключа /home/user/.ssh/vps_tunnel — сначала выполните scripts/setup-tunnel.sh"
+  echo "нет ключа /home/user/.ssh/vps_tunnel — создайте его: ssh-keygen -t ed25519 -f /home/user/.ssh/vps_tunnel"
   sleep 300
   exit 1
 fi

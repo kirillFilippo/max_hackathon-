@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import { createApp } from '../src/app.js';
 import { createLogger } from '../src/logger.js';
 import { hoursFromNow, testConfig } from './support.js';
+import { ticketFor } from './tickets.js';
 
 /**
  * Сборка приложения: композиционный корень до сих пор не был покрыт тестами,
@@ -58,12 +59,7 @@ describe('Сборка приложения', () => {
       assert.ok(bridge, 'мост мини-приложения не собран');
 
       // Ссылка конструктора строится по подписи и ведёт на страницу вопросов.
-      await bridge.registerTicket('ticket-1', {
-        userId: 7,
-        chatId: 42,
-        sessionKey: '7:42',
-        at: Date.now(),
-      });
+      await bridge.registerTicket('ticket-1', ticketFor(7, { chatId: 42, sessionKey: '7:42' }));
       const url = bridge.buildUrl('ticket-1');
       assert.match(url, /^https:\/\/example\.test\/app\/questions\?t=ticket-1$/);
 

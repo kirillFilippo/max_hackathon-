@@ -4,6 +4,7 @@ import { after, before, describe, it } from 'node:test';
 import { startMiniappServer, type MiniappField, type MiniappHandle, type MiniappTicket } from '../src/miniapp/server.js';
 import { newTicket } from '../src/miniapp/server.js';
 import { MINIAPP_CHAT_WEIGHT_LIMIT, MINIAPP_MAX_FIELDS } from '../src/miniapp/questionsPage.js';
+import { ticketFor } from './tickets.js';
 import type { AnswerMode } from '../src/domain/types.js';
 import { createHmac } from 'node:crypto';
 
@@ -68,7 +69,7 @@ before(async () => {
       if (at === undefined) return null;
       // Чат и сессия мастера — часть пропуска: без них конструктор не знает,
       // какой черновик править и куда вернуть обновлённый экран.
-      return { userId: 7, chatId: 42, sessionKey: '7:42', at };
+      return ticketFor(7, { chatId: 42, sessionKey: '7:42', at });
     },
     onFieldsSaved: async (ticket, fields, answerMode, name) => {
       saved.push({ ticket, fields, answerMode, name });

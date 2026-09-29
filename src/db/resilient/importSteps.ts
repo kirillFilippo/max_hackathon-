@@ -7,7 +7,7 @@ import type {
   Reservation,
   Template,
 } from '../../domain/types.js';
-import { emptyDeletions, type MemoryDeletions, type MemorySnapshot } from '../memory/store.js';
+import type { MemoryDeletions, MemorySnapshot } from '../memory/store.js';
 
 /**
  * Шаги переноса памяти в PostgreSQL: по одному на сущность.

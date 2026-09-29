@@ -10,6 +10,8 @@ import type { Db } from '../src/db/pool.js';
 import type { Repositories } from '../src/db/repositories/contracts.js';
 import { createRepositories } from '../src/db/repositories/index.js';
 import { REPOSITORY_SPEC } from '../src/db/resilient/resilientRepositories.js';
+import { renderAnswerPageHtml } from '../src/miniapp/answerPage.js';
+import { renderMiniappHtml } from '../src/miniapp/questionsPage.js';
 
 /**
  * Архитектурные стражи: проверки, которые дешевле выполнять машиной, чем ревьюером.
@@ -157,16 +159,56 @@ describe('архитектура: слои', () => {
   });
 });
 
+describe('архитектура: страницы мини-приложения', () => {
+  /**
+   * Страницы — это HTML со встроенным скриптом, и поведение их тестами не
+   * проверить: JS исполняется только в вебвью MAX. Но синтаксис и обязательное
+   * знакомство с мостом проверяются здесь: без `WebApp.ready()` вебвью остаётся
+   * на экране загрузки, и это уже случалось.
+   */
+  it('встроенный скрипт разбирается и знакомится с мостом MAX', () => {
+    const pages = [
+      { name: 'questions', html: renderMiniappHtml({ title: 'Вопросы' }) },
+      { name: 'answer', html: renderAnswerPageHtml({ title: 'Анкета' }) },
+    ];
+    const problems: string[] = [];
+
+    for (const page of pages) {
+      // Внешний <script src=…> не наш: он подключает мост MAX.
+      const scripts = [...page.html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)];
+      if (scripts.length === 0) problems.push(`${page.name}: нет встроенного скрипта`);
+
+      for (const script of scripts) {
+        const code = script[1] ?? '';
+        if (!code.includes('WebApp.ready()')) problems.push(`${page.name}: нет WebApp.ready()`);
+        try {
+          // Компилируем, но не выполняем: в Node нет ни document, ни WebApp.
+          new Function(code);
+        } catch (error) {
+          problems.push(`${page.name}: синтаксис скрипта — ${(error as Error).message}`);
+        }
+      }
+    }
+
+    assert.deepEqual(problems, [], `Проблемы страниц мини-приложения:\n${problems.join('\n')}`);
+  });
+});
+
 describe('архитектура: служебные скрипты', () => {
   /**
    * Скрипты деплоя тестами не покрыть: они ходят по SSH и поднимают контейнеры.
    * Но синтаксис проверить можно — опечатка в них иначе находится уже на узле.
+   * Сам каталог `scripts/` в репозиторий не входит (служебный, живёт локально),
+   * поэтому при его отсутствии проверять нечего.
    */
   it('разбираются оболочкой (bash -n)', () => {
-    const scripts = ['deploy.sh', 'deploy-home.sh', 'setup-vps.sh', 'bootstrap-void.sh'];
+    const scriptsDir = path.join(path.dirname(SRC_DIR), 'scripts');
+    if (!existsSync(scriptsDir)) return;
+
+    const scripts = readdirSync(scriptsDir).filter((name) => name.endsWith('.sh'));
     const broken: string[] = [];
     for (const name of scripts) {
-      const file = path.join(path.dirname(SRC_DIR), 'scripts', name);
+      const file = path.join(scriptsDir, name);
       try {
         execFileSync('bash', ['-n', file], { stdio: 'pipe' });
       } catch (error) {
