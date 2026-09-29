@@ -107,6 +107,8 @@ const LAYER_RULES: Record<string, string[]> = {
   db: ['bot', 'services', 'miniapp', 'app'],
   services: ['bot', 'miniapp', 'app'],
   miniapp: ['bot', 'services', 'app'],
+  // `app` собирает бота и мини-приложение, поэтому обратный импорт дал бы цикл.
+  bot: ['app'],
 };
 
 /** Слой файла: первый каталог под `src/` или `root` для файлов верхнего уровня. */

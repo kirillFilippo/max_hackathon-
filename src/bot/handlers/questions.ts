@@ -17,7 +17,7 @@ import type { AppDeps } from '../deps.js';
 import { button, cb, link, withKeyboard, type KeyboardRows, type MessageContent } from '../message.js';
 import type { EventDraftData, FieldEditorHost } from '../session.js';
 import { fieldsEditor } from '../texts/event/index.js';
-import { botUsernameOf, userIdOf } from './helpers.js';
+import { botUsernameOf } from './helpers.js';
 
 /**
  * Черновик с вопросами. Способ ответа и выбранный шаблон есть только у события,
