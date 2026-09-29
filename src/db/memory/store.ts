@@ -7,76 +7,33 @@ import type {
   Template,
   UserProfile,
 } from '../../domain/types.js';
+import { restoreSnapshot, takeSnapshot } from './snapshot.js';
+import type { MemoryDeletions, MemorySnapshot, StoredUserProfile } from './types.js';
 
 /**
  * Хранилище в памяти: временная замена PostgreSQL.
  *
  * Два сценария использования:
  *  - база недоступна — репозитории работают здесь, а при восстановлении связи
- *    снимок (`snapshot`) переносится в PostgreSQL;
+ *    снимок переносится в PostgreSQL;
  *  - «зеркало» базы — фасад после успешного запроса в БД кладёт полученные
  *    сущности сюда через `put*`, чтобы при обрыве связи продолжить работу
  *    с тем же состоянием.
  *
  * Наружу отдаются только копии: вызывающий код не может испортить хранилище.
- * Файл не знает ни о сети, ни о диске — снимок сериализуется снаружи.
+ * Здесь состояние и доступ к нему; формат снимка описан в `types.ts`, снятие и
+ * загрузка — в `snapshot.ts`. Реэкспорт ниже сохраняет привычные импорты
+ * из `memory/store.js`.
  */
 
-/** Версия формата снимка: пригодится, если структура данных поменяется. */
-export const MEMORY_SNAPSHOT_VERSION = 1;
-
-/**
- * Профиль вместе со служебными датами. В `UserProfile` их нет, а `createdAt`
- * нужен сервисам (например, чтобы отличить новичка от постоянного гостя).
- */
-export interface StoredUserProfile extends UserProfile {
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Удаления, сделанные без связи.
- *
- * Без них синхронизация не может отличить «брони никогда не было» от «бронь сняли
- * в офлайне»: первое трогать нельзя (в базе её мог создать кто-то ещё), второе
- * обязано доехать. То же с заявками, позициями и наборами: удаление, потерянное
- * при переносе, оставляет мусор в базе навсегда.
- */
-export interface MemoryDeletions {
-  participants: Array<{ eventId: string; userId: number }>;
-  items: string[];
-  reservations: string[];
-  templates: string[];
-}
-
-const emptyDeletions = (): MemoryDeletions => ({
-  participants: [],
-  items: [],
-  reservations: [],
-  templates: [],
-});
-
-/** Снимок состояния: только обычные объекты и массивы — годится для JSON и БД. */
-export interface MemorySnapshot {
-  version: number;
-  events: DosugEvent[];
-  participants: Participant[];
-  items: EventItem[];
-  reservations: Reservation[];
-  templates: Template[];
-  users: StoredUserProfile[];
-  /** Удаления, которые ещё не применены в базе (см. `MemoryDeletions`). */
-  deletions: MemoryDeletions;
-}
+export { MEMORY_SNAPSHOT_VERSION, emptyDeletions } from './types.js';
+export type { MemoryDeletions, MemorySnapshot, StoredUserProfile } from './types.js';
 
 /** Копия сущности: хранилище не делится внутренними ссылками с вызывающим кодом. */
 const copy = <T>(value: T): T => structuredClone(value);
 
 /** Ключ участника: в БД это UNIQUE (event_id, user_id). */
 const participantKey = (eventId: string, userId: number): string => `${eventId}\u0000${userId}`;
-
-/** Список из снимка: JSON с диска может прийти неполным. */
-const snapshotList = <T>(value: T[] | undefined): T[] => (Array.isArray(value) ? value : []);
 
 export class MemoryStore {
   private readonly eventById = new Map<string, DosugEvent>();
@@ -283,46 +240,31 @@ export class MemoryStore {
 
   // --- снимок состояния ---
 
-  /** Снимок для синхронизации в PostgreSQL и сохранения на диск. */
-  snapshot(): MemorySnapshot {
-    return {
-      version: MEMORY_SNAPSHOT_VERSION,
-      events: this.events(),
-      participants: this.participants(),
-      items: this.items(),
-      reservations: this.reservations(),
-      templates: this.templates(),
-      users: this.users(),
-      deletions: this.pendingDeletions(),
-    };
-  }
-
-  /** Загружает снимок вместо текущего состояния и перестраивает все индексы. */
-  restore(snapshot: MemorySnapshot): void {
-    this.clear();
-    const reservations = new Map(
-      snapshotList(snapshot.reservations).map((reservation) => [reservation.itemId, reservation]),
-    );
-    for (const event of snapshotList(snapshot.events)) this.putEvent(event);
-    for (const participant of snapshotList(snapshot.participants)) this.putParticipant(participant);
-    for (const item of snapshotList(snapshot.items)) {
-      this.putItem({ ...item, reservation: reservations.get(item.id) ?? null });
-    }
-    for (const template of snapshotList(snapshot.templates)) this.putTemplate(template);
-    for (const user of snapshotList(snapshot.users)) this.putUser(user);
-
-    // Удаления загружаем последними: снимок мог быть создан версией без них,
-    // а `put*` выше снимает надгробия у тех сущностей, что снова появились.
-    const deletions = snapshot.deletions ?? emptyDeletions();
-    for (const participant of snapshotList(deletions.participants)) {
+  /**
+   * Загружает надгробия из снимка. Нужно `restoreSnapshot`: карты удалений
+   * приватны, а `put*` снимает надгробия у вернувшихся сущностей — поэтому
+   * удаления загружаются последними, отдельным вызовом.
+   */
+  loadDeletions(deletions: MemoryDeletions): void {
+    for (const participant of deletions.participants ?? []) {
       this.deletedParticipantByKey.set(
         participantKey(participant.eventId, participant.userId),
         participant,
       );
     }
-    for (const itemId of snapshotList(deletions.items)) this.deletedItemIds.add(itemId);
-    for (const itemId of snapshotList(deletions.reservations)) this.deletedReservationIds.add(itemId);
-    for (const templateId of snapshotList(deletions.templates)) this.deletedTemplateIds.add(templateId);
+    for (const itemId of deletions.items ?? []) this.deletedItemIds.add(itemId);
+    for (const itemId of deletions.reservations ?? []) this.deletedReservationIds.add(itemId);
+    for (const templateId of deletions.templates ?? []) this.deletedTemplateIds.add(templateId);
+  }
+
+  /** Снимок для синхронизации в PostgreSQL и сохранения на диск. */
+  snapshot(): MemorySnapshot {
+    return takeSnapshot(this);
+  }
+
+  /** Загружает снимок вместо текущего состояния и перестраивает все индексы. */
+  restore(snapshot: MemorySnapshot): void {
+    restoreSnapshot(this, snapshot);
   }
 
   isEmpty(): boolean {

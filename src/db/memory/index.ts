@@ -12,7 +12,7 @@ import { MemoryStore } from './store.js';
  * DEVELOPER-GUIDE: правка SQL-репозитория требует такой же правки здесь.
  */
 export { MemoryStore } from './store.js';
-export type { MemorySnapshot, StoredUserProfile } from './store.js';
+export type { MemoryDeletions, MemorySnapshot, StoredUserProfile } from './types.js';
 
 export {
   MemoryEventsRepository,
