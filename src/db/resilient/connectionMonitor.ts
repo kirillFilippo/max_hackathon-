@@ -31,6 +31,12 @@ const CONNECTION_CODES = new Set([
   'ENOTFOUND',
   'EHOSTUNREACH',
   'ENETUNREACH',
+  // Класс 08 — сбой соединения, 57Pxx — администратор выключил сервер,
+  // 53300/53400 — кончились соединения, 28P01 — неверный пароль (конфигурация),
+  // 3D000 — базы нет. Последние два не «бизнес-ошибка»: повторять их на каждый
+  // запрос бессмысленно, поэтому работаем из памяти, а сторож пингует базу.
+  '28P01',
+  '3D000',
   '08000',
   '08001',
   '08003',
@@ -48,7 +54,7 @@ export const isConnectionError = (error: unknown): boolean => {
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code === 'string' && CONNECTION_CODES.has(code)) return true;
   const message = String((error as { message?: unknown } | null)?.message ?? '');
-  return /Connection terminated|Connection refused|timeout exceeded when trying to connect|Client has encountered a connection error|the database system is (starting up|shutting down)|too many clients|Connection ended|connect ECONNREFUSED/i.test(
+  return /Connection terminated|Connection refused|timeout exceeded when trying to connect|Client has encountered a connection error|the database system is (starting up|shutting down)|too many clients|Connection ended|connect ECONNREFUSED|password authentication failed|database .* does not exist|role .* does not exist/i.test(
     message,
   );
 };

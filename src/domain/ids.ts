@@ -19,8 +19,6 @@ export const newFieldId = (): string => newId('fld');
 
 export const newItemId = (): string => newId('itm');
 
-export const newTransferId = (): string => newId('trf');
-
 export const newParticipantId = (): string => newId('prt');
 
 export const newTemplateId = (): string => newId('tpl');
@@ -34,7 +32,7 @@ export const normalizeCode = (raw: string): string =>
 
 /**
  * Синтетический пользователь отладочного события: нужен, чтобы посмотреть
- * карточки, состав и расчёты, но в MAX такого человека нет. Отрицательный id —
+ * карточки и состав события, но в MAX такого человека нет. Отрицательный id —
  * признак «сообщения этому пользователю не доставляем»: настоящие id в MAX
  * всегда положительные.
  */

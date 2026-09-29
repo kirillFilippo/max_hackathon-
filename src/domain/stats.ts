@@ -6,8 +6,8 @@ import type { DosugEvent, EventStats, Participant } from './types.js';
  */
 /**
  * Идёт ли человек на событие: «иду» и не в листе ожидания. Условие встречается
- * в панели, напоминаниях, расчётах и FAQ — держим его в одном месте, иначе
- * списки «идут» начнут расходиться между экранами.
+ * в панели, напоминаниях и FAQ — держим его в одном месте, иначе списки «идут»
+ * начнут расходиться между экранами.
  */
 export const isGoing = (participant: Participant): boolean =>
   participant.status === 'going' && !participant.waitlisted;

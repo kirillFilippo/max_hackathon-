@@ -1,30 +1,11 @@
 import { newParticipantId } from '../../domain/ids.js';
+import type { Participant } from '../../domain/types.js';
 import type {
-  DosugEvent,
-  EventField,
-  EventItem,
-  ItemWithReservation,
-  Participant,
-  Reservation,
-  Template,
-  UserProfile,
-} from '../../domain/types.js';
-import type {
-  CreateEventRecord,
-  EventPatch,
-  EventsRepository,
-  ItemsRepository,
   ParticipantPatch,
   ParticipantsRepository,
-  Repositories,
-  ReserveResult,
   SaveParticipantInput,
-  TemplatesRepository,
-  UserPatch,
-  UsersRepository,
 } from '../repositories/contracts.js';
 import { MemoryStore } from './store.js';
-import type { MemorySnapshot, StoredUserProfile } from './store.js';
 
 /**
  * Репозитории поверх памяти: та же семантика, что у PostgreSQL-версии
@@ -34,9 +15,6 @@ import type { MemorySnapshot, StoredUserProfile } from './store.js';
  * Порядок сортировки, состав полей и null-значения повторяют SQL: расхождение
  * здесь заметно сервисам, которые не знают, откуда пришли данные.
  */
-
-export { MemoryStore };
-export type { MemorySnapshot, StoredUserProfile };
 
 import { mapParticipant, nowIso, sortByTime } from './helpers.js';
 

@@ -5,7 +5,6 @@ import { ParticipantsRepo } from './participantsRepo.js';
 import { TemplatesRepo } from './templatesRepo.js';
 import { UsersRepo } from './usersRepo.js';
 
-export { EventsRepo, ItemsRepo, ParticipantsRepo, TemplatesRepo, UsersRepo };
 export * from './contracts.js';
 
 import type { Repositories } from './contracts.js';

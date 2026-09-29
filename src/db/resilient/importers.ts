@@ -1,4 +1,7 @@
+import type { PoolClient } from 'pg';
+
 import type { Db } from '../pool.js';
+import type { DosugEvent } from '../../domain/types.js';
 import type { MemorySnapshot } from '../memory/store.js';
 
 /**
@@ -11,10 +14,48 @@ import type { MemorySnapshot } from '../memory/store.js';
  * строки, а не создаёт дубли.
  */
 
+/** Что пришлось изменить при переносе: вызывающий применяет это к зеркалу. */
+export interface ImportResult {
+  /**
+   * События, которым сменили код: их код в базе был занят другим событием.
+   * Память обязана узнать об этом, иначе `findByCode` будет отвечать по-разному
+   * в зависимости от того, доступна база или нет.
+   */
+  renamedEventCodes: Array<{ id: string; from: string; to: string }>;
+}
+
 /** Приводит ISO-строку к значению для timestamptz (или к null). */
 const ts = (value: string | null | undefined): string | null => value ?? null;
 
-export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<void> => {
+/**
+ * Подбирает свободный код события.
+ *
+ * Конфликт возможен, если событие создали в памяти с кодом, который уже занят
+ * в базе. Перебор суффиксов детерминированный: повторная синхронизация того же
+ * снимка выберет тот же код, а не новый — иначе база и память разъедутся.
+ */
+const resolveEventCode = async (
+  client: PoolClient,
+  event: DosugEvent,
+): Promise<{ code: string; renamed: boolean }> => {
+  const takenByOther = async (code: string): Promise<boolean> => {
+    const row = await client.query<{ id: string }>('SELECT id FROM events WHERE code = $1', [code]);
+    const owner = row.rows[0];
+    // Код занят только чужой строкой: свою запись этот же id мог получить раньше.
+    return owner !== undefined && owner.id !== event.id;
+  };
+
+  if (!(await takenByOther(event.code))) return { code: event.code, renamed: false };
+  for (let suffix = 10; suffix <= 99; suffix += 1) {
+    const candidate = `${event.code}${suffix}`;
+    if (!(await takenByOther(candidate))) return { code: candidate, renamed: true };
+  }
+  throw new Error(`Не удалось подобрать свободный код для события ${event.id}`);
+};
+
+export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<ImportResult> => {
+  const renamedEventCodes: ImportResult['renamedEventCodes'] = [];
+
   await db.transaction(async (client) => {
     for (const user of snapshot.users) {
       await client.query(
@@ -30,14 +71,8 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
     }
 
     for (const event of snapshot.events) {
-      // Конфликт по коду возможен, если событие создали в памяти с кодом, который
-      // уже занят в базе: код уникален, поэтому переносим такое событие с новым кодом.
-      const codeRow = await client.query<{ id: string }>(
-        'SELECT id FROM events WHERE code = $1',
-        [event.code],
-      );
-      const codeTaken = codeRow.rows[0] !== undefined && codeRow.rows[0].id !== event.id;
-      const code = codeTaken ? `${event.code}${Math.floor(Math.random() * 90 + 10)}` : event.code;
+      const { code, renamed } = await resolveEventCode(client, event);
+      if (renamed) renamedEventCodes.push({ id: event.id, from: event.code, to: code });
 
       await client.query(
         `INSERT INTO events
@@ -47,6 +82,7 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
          VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14,
                  COALESCE($15::timestamptz, now()), now(), $16::timestamptz)
          ON CONFLICT (id) DO UPDATE SET
+           code           = EXCLUDED.code,
            title          = EXCLUDED.title,
            description    = EXCLUDED.description,
            starts_at      = EXCLUDED.starts_at,
@@ -82,7 +118,29 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
       );
     }
 
+    // id из снимка может быть занят другой заявкой: тогда пишем по естественному
+    // ключу (event_id, user_id) и оставляем id, который уже есть в базе — иначе
+    // конфликт первичного ключа откатывал бы всю синхронизацию.
+    // Запрос идёт через `client`: второй клиент из пула не увидел бы записи этой
+    // же транзакции и держал бы лишнее соединение.
+    const participantIds = new Map(
+      (
+        await client.query<{ id: string; event_id: string; user_id: number }>(
+          `SELECT id, event_id, user_id FROM participants
+           WHERE (event_id, user_id) IN (
+             SELECT * FROM unnest($1::text[], $2::bigint[])
+           )`,
+          [
+            snapshot.participants.map((participant) => participant.eventId),
+            snapshot.participants.map((participant) => participant.userId),
+          ],
+        )
+      ).rows.map((row) => [`${row.event_id}\u0000${row.user_id}`, row.id]),
+    );
+
     for (const participant of snapshot.participants) {
+      const participantId = participantIds.get(`${participant.eventId}\u0000${participant.userId}`)
+        ?? participant.id;
       await client.query(
         `INSERT INTO participants
            (id, event_id, user_id, name, username, contact, status, answers, waitlisted,
@@ -100,7 +158,7 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
            final_sent_at   = EXCLUDED.final_sent_at,
            updated_at      = now()`,
         [
-          participant.id,
+          participantId,
           participant.eventId,
           participant.userId,
           participant.name,
@@ -148,9 +206,11 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
             reservation.note,
           ],
         );
-      } else {
-        await client.query('DELETE FROM reservations WHERE item_id = $1', [item.id]);
       }
+      // Если брони в снимке нет — молчим. Раньше здесь стоял DELETE, и он сносил
+      // бронь, поставленную в базе уже после последнего обновления зеркала:
+      // «позиция свободна у нас» и «бронь сняли в офлайне» — разные вещи.
+      // Настоящие удаления приходят отдельно, в `deletions`.
     }
 
     for (const template of snapshot.templates) {
@@ -162,5 +222,27 @@ export const importSnapshot = async (db: Db, snapshot: MemorySnapshot): Promise<
       );
     }
 
+    // Удаления, сделанные без связи, применяем последними: удаление должно быть
+    // последним словом, иначе следующая синхронизация вернула бы строку обратно.
+    const deletions = snapshot.deletions
+      ?? { participants: [], items: [], reservations: [], templates: [] };
+    for (const participant of deletions.participants) {
+      await client.query('DELETE FROM participants WHERE event_id = $1 AND user_id = $2', [
+        participant.eventId,
+        participant.userId,
+      ]);
+    }
+    for (const itemId of deletions.items) {
+      // Позиция уходит вместе с бронью — как ON DELETE CASCADE в схеме.
+      await client.query('DELETE FROM event_items WHERE id = $1', [itemId]);
+    }
+    for (const itemId of deletions.reservations) {
+      await client.query('DELETE FROM reservations WHERE item_id = $1', [itemId]);
+    }
+    for (const templateId of deletions.templates) {
+      await client.query('DELETE FROM templates WHERE id = $1', [templateId]);
+    }
   });
+
+  return { renamedEventCodes };
 };

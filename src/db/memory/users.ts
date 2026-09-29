@@ -1,29 +1,7 @@
-import type {
-  DosugEvent,
-  EventField,
-  EventItem,
-  ItemWithReservation,
-  Participant,
-  Reservation,
-  Template,
-  UserProfile,
-} from '../../domain/types.js';
-import type {
-  CreateEventRecord,
-  EventPatch,
-  EventsRepository,
-  ItemsRepository,
-  ParticipantPatch,
-  ParticipantsRepository,
-  Repositories,
-  ReserveResult,
-  SaveParticipantInput,
-  TemplatesRepository,
-  UserPatch,
-  UsersRepository,
-} from '../repositories/contracts.js';
+import type { UserProfile } from '../../domain/types.js';
+import type { UserPatch, UsersRepository } from '../repositories/contracts.js';
 import { MemoryStore } from './store.js';
-import type { MemorySnapshot, StoredUserProfile } from './store.js';
+import type { StoredUserProfile } from './store.js';
 
 /**
  * Репозитории поверх памяти: та же семантика, что у PostgreSQL-версии
@@ -33,9 +11,6 @@ import type { MemorySnapshot, StoredUserProfile } from './store.js';
  * Порядок сортировки, состав полей и null-значения повторяют SQL: расхождение
  * здесь заметно сервисам, которые не знают, откуда пришли данные.
  */
-
-export { MemoryStore };
-export type { MemorySnapshot, StoredUserProfile };
 
 import { mapUser, nowIso } from './helpers.js';
 
@@ -102,8 +77,3 @@ export class MemoryUsersRepository implements UsersRepository {
     return user ? user.createdAt : null;
   }
 }
-
-/**
- * Собирает набор репозиториев в памяти. Хранилище можно передать снаружи —
- * тогда зеркало базы и репозитории работают с одними и теми же данными.
- */

@@ -2,7 +2,7 @@ import { Pool, types, type PoolClient, type QueryResult, type QueryResultRow } f
 
 import type { Logger } from '../logger.js';
 
-// bigint (int8) по умолчанию приходит строкой — приводим к number: id MAX и копейки
+// bigint (int8) по умолчанию приходит строкой — приводим к number: id MAX и счётчики
 // не выходят за пределы безопасного целого.
 types.setTypeParser(types.builtins.INT8, (value: string) => Number(value));
 

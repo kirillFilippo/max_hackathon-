@@ -12,7 +12,6 @@ import type {
   DosugEvent,
   EventField,
   EventItem,
-  ItemWithReservation,
   Participant,
   Reservation,
   Template,
@@ -596,6 +595,7 @@ describe('память: снимок и зеркало базы', () => {
       events: 1,
       participants: 0,
       items: 0,
+      reservations: 0,
       templates: 0,
       users: 0,
     });
@@ -680,6 +680,7 @@ describe('память: снимок и зеркало базы', () => {
     assert.equal(store.isEmpty(), false);
     const snapshot = store.snapshot();
     assert.deepEqual(Object.keys(snapshot).sort(), [
+      'deletions',
       'events',
       'items',
       'participants',
@@ -722,6 +723,7 @@ describe('память: снимок и зеркало базы', () => {
       events: 0,
       participants: 0,
       items: 0,
+      reservations: 0,
       templates: 0,
       users: 0,
     });
@@ -745,6 +747,7 @@ describe('память: снимок и зеркало базы', () => {
           updatedAt: '2030-01-02T00:00:00.000Z',
         },
       ],
+      deletions: { participants: [], items: [], reservations: [], templates: [] },
     };
 
     store.restore(snapshot);
@@ -763,6 +766,7 @@ describe('память: снимок и зеркало базы', () => {
       reservations: [],
       templates: [],
       users: [],
+      deletions: { participants: [], items: [], reservations: [], templates: [] },
     });
     assert.equal(store.isEmpty(), false);
     assert.equal(store.counts().events, 1);

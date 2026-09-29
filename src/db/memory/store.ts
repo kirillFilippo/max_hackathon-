@@ -34,6 +34,28 @@ export interface StoredUserProfile extends UserProfile {
   updatedAt: string;
 }
 
+/**
+ * Удаления, сделанные без связи.
+ *
+ * Без них синхронизация не может отличить «брони никогда не было» от «бронь сняли
+ * в офлайне»: первое трогать нельзя (в базе её мог создать кто-то ещё), второе
+ * обязано доехать. То же с заявками, позициями и наборами: удаление, потерянное
+ * при переносе, оставляет мусор в базе навсегда.
+ */
+export interface MemoryDeletions {
+  participants: Array<{ eventId: string; userId: number }>;
+  items: string[];
+  reservations: string[];
+  templates: string[];
+}
+
+const emptyDeletions = (): MemoryDeletions => ({
+  participants: [],
+  items: [],
+  reservations: [],
+  templates: [],
+});
+
 /** Снимок состояния: только обычные объекты и массивы — годится для JSON и БД. */
 export interface MemorySnapshot {
   version: number;
@@ -43,6 +65,8 @@ export interface MemorySnapshot {
   reservations: Reservation[];
   templates: Template[];
   users: StoredUserProfile[];
+  /** Удаления, которые ещё не применены в базе (см. `MemoryDeletions`). */
+  deletions: MemoryDeletions;
 }
 
 /** Копия сущности: хранилище не делится внутренними ссылками с вызывающим кодом. */
@@ -50,8 +74,6 @@ const copy = <T>(value: T): T => structuredClone(value);
 
 /** Ключ участника: в БД это UNIQUE (event_id, user_id). */
 const participantKey = (eventId: string, userId: number): string => `${eventId}\u0000${userId}`;
-
-/** Ключ расчёта: в БД это UNIQUE (event_id, from_user_id, to_user_id). */
 
 /** Список из снимка: JSON с диска может прийти неполным. */
 const snapshotList = <T>(value: T[] | undefined): T[] => (Array.isArray(value) ? value : []);
@@ -66,6 +88,12 @@ export class MemoryStore {
   private readonly reservationByItemId = new Map<string, Reservation>();
   private readonly templateById = new Map<string, Template>();
   private readonly userById = new Map<number, StoredUserProfile>();
+
+  // --- удаления, которые ещё не уехали в базу ---
+  private readonly deletedParticipantByKey = new Map<string, { eventId: string; userId: number }>();
+  private readonly deletedItemIds = new Set<string>();
+  private readonly deletedReservationIds = new Set<string>();
+  private readonly deletedTemplateIds = new Set<string>();
 
   // --- чтение: наружу уходят только копии ---
 
@@ -143,27 +171,28 @@ export class MemoryStore {
 
   /** Кладёт участника по ключу (eventId, userId), id сохраняется как есть. */
   putParticipant(participant: Participant): void {
-    this.participantByKey.set(participantKey(participant.eventId, participant.userId), copy(participant));
+    const key = participantKey(participant.eventId, participant.userId);
+    // Сущность снова в памяти — значит, удалять её в базе больше не нужно.
+    this.deletedParticipantByKey.delete(key);
+    this.participantByKey.set(key, copy(participant));
   }
 
   /** Кладёт позицию вместе с бронью; `reservation: null` снимает бронь. */
   putItem(item: ItemWithReservation): void {
     const { reservation, ...rest } = item;
+    this.deletedItemIds.delete(rest.id);
     this.itemById.set(rest.id, copy(rest));
     if (reservation === null || reservation === undefined) this.reservationByItemId.delete(rest.id);
-    else this.reservationByItemId.set(rest.id, copy(reservation));
-  }
-
-  /** Кладёт бронь по ключу item_id. */
-  putReservation(reservation: Reservation): void {
-    this.reservationByItemId.set(reservation.itemId, copy(reservation));
+    else {
+      this.deletedReservationIds.delete(rest.id);
+      this.reservationByItemId.set(rest.id, copy(reservation));
+    }
   }
 
   putTemplate(template: Template): void {
+    this.deletedTemplateIds.delete(template.id);
     this.templateById.set(template.id, copy(template));
   }
-
-  /** Кладёт расчёт по id, поддерживая ключ пары (eventId, fromUserId, toUserId). */
 
   /** Кладёт профиль по userId, сохраняя даты создания и обновления. */
   putUser(profile: UserProfile & Partial<Pick<StoredUserProfile, 'createdAt' | 'updatedAt'>>): void {
@@ -184,11 +213,17 @@ export class MemoryStore {
   // --- удаление ---
 
   deleteParticipant(eventId: string, userId: number): boolean {
-    return this.participantByKey.delete(participantKey(eventId, userId));
+    const key = participantKey(eventId, userId);
+    const removed = this.participantByKey.delete(key);
+    // Запоминаем удаление: связь может пропасть раньше, чем оно доедет до базы.
+    if (removed) this.deletedParticipantByKey.set(key, { eventId, userId });
+    return removed;
   }
 
   deleteReservation(itemId: string): boolean {
-    return this.reservationByItemId.delete(itemId);
+    const removed = this.reservationByItemId.delete(itemId);
+    if (removed) this.deletedReservationIds.add(itemId);
+    return removed;
   }
 
   /** Снимает все брони пользователя в событии (DELETE ... WHERE event_id AND user_id). */
@@ -197,6 +232,7 @@ export class MemoryStore {
     for (const reservation of this.reservationByItemId.values()) {
       if (reservation.eventId === eventId && reservation.userId === userId) {
         this.reservationByItemId.delete(reservation.itemId);
+        this.deletedReservationIds.add(reservation.itemId);
         removed += 1;
       }
     }
@@ -207,11 +243,42 @@ export class MemoryStore {
   deleteItem(itemId: string): boolean {
     const existed = this.itemById.delete(itemId);
     this.reservationByItemId.delete(itemId);
+    if (existed) this.deletedItemIds.add(itemId);
     return existed;
   }
 
   deleteTemplate(id: string): boolean {
-    return this.templateById.delete(id);
+    const removed = this.templateById.delete(id);
+    if (removed) this.deletedTemplateIds.add(id);
+    return removed;
+  }
+
+  // --- удаления для синхронизации ---
+
+  /** Удаления, которые ещё нужно применить в базе. */
+  pendingDeletions(): MemoryDeletions {
+    return {
+      participants: [...this.deletedParticipantByKey.values()].map(copy),
+      items: [...this.deletedItemIds],
+      reservations: [...this.deletedReservationIds],
+      templates: [...this.deletedTemplateIds],
+    };
+  }
+
+  /** Сколько удалений ждёт переноса: по ним синхронизация тоже нужна. */
+  pendingDeletionCount(): number {
+    return this.deletedParticipantByKey.size
+      + this.deletedItemIds.size
+      + this.deletedReservationIds.size
+      + this.deletedTemplateIds.size;
+  }
+
+  /** Забыть применённые удаления: вызывается после успешного переноса в базу. */
+  clearDeletions(): void {
+    this.deletedParticipantByKey.clear();
+    this.deletedItemIds.clear();
+    this.deletedReservationIds.clear();
+    this.deletedTemplateIds.clear();
   }
 
   // --- снимок состояния ---
@@ -226,6 +293,7 @@ export class MemoryStore {
       reservations: this.reservations(),
       templates: this.templates(),
       users: this.users(),
+      deletions: this.pendingDeletions(),
     };
   }
 
@@ -242,6 +310,19 @@ export class MemoryStore {
     }
     for (const template of snapshotList(snapshot.templates)) this.putTemplate(template);
     for (const user of snapshotList(snapshot.users)) this.putUser(user);
+
+    // Удаления загружаем последними: снимок мог быть создан версией без них,
+    // а `put*` выше снимает надгробия у тех сущностей, что снова появились.
+    const deletions = snapshot.deletions ?? emptyDeletions();
+    for (const participant of snapshotList(deletions.participants)) {
+      this.deletedParticipantByKey.set(
+        participantKey(participant.eventId, participant.userId),
+        participant,
+      );
+    }
+    for (const itemId of snapshotList(deletions.items)) this.deletedItemIds.add(itemId);
+    for (const itemId of snapshotList(deletions.reservations)) this.deletedReservationIds.add(itemId);
+    for (const templateId of snapshotList(deletions.templates)) this.deletedTemplateIds.add(templateId);
   }
 
   isEmpty(): boolean {
@@ -251,7 +332,8 @@ export class MemoryStore {
       this.itemById.size === 0 &&
       this.reservationByItemId.size === 0 &&
       this.templateById.size === 0 &&
-      this.userById.size === 0
+      this.userById.size === 0 &&
+      this.pendingDeletionCount() === 0
     );
   }
 
@@ -260,6 +342,7 @@ export class MemoryStore {
     events: number;
     participants: number;
     items: number;
+    reservations: number;
     templates: number;
     users: number;
   } {
@@ -267,6 +350,7 @@ export class MemoryStore {
       events: this.eventById.size,
       participants: this.participantByKey.size,
       items: this.itemById.size,
+      reservations: this.reservationByItemId.size,
       templates: this.templateById.size,
       users: this.userById.size,
     };
@@ -280,5 +364,6 @@ export class MemoryStore {
     this.reservationByItemId.clear();
     this.templateById.clear();
     this.userById.clear();
+    this.clearDeletions();
   }
 }

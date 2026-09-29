@@ -49,13 +49,17 @@ const putUser: Mirror = (store, result) => {
   for (const item of skipEmpty(result)) store.putUser(item as UserProfile);
 };
 
-/** Что делать с результатом каждого метода: класть сущности или повторять вызов. */
-const SPEC: Record<keyof Repositories, RepoSpec> = {
+/**
+ * Что делать с результатом каждого метода: класть сущности или повторять вызов.
+ *
+ * Экспортируется ради теста полноты: метод репозитория, которого здесь нет, молча
+ * теряет офлайн-фолбэк — при обрыве связи он уйдёт в базу и упадёт.
+ */
+export const REPOSITORY_SPEC: Record<keyof Repositories, RepoSpec> = {
   users: {
     ensure: { put: putUser },
     find: { put: putUser },
     saveContact: { put: putUser },
-    savePaymentDetails: { put: putUser },
     createdAt: {},
   },
   events: {
@@ -77,7 +81,6 @@ const SPEC: Record<keyof Repositories, RepoSpec> = {
     reserve: { put: (store, result) => putItem(store, (result as { reserved?: unknown })?.reserved ?? null) },
     release: { replay: true },
     releaseAllForUser: { replay: true },
-    setPaidAmount: { put: putItem },
     deleteItem: { replay: true },
   },
   participants: {
@@ -192,13 +195,13 @@ export const createResilientRepositories = (options: ResilientOptions): Resilien
   };
 
   const repositories = Object.fromEntries(
-    (Object.keys(SPEC) as Array<keyof Repositories>).map((key) => [
+    (Object.keys(REPOSITORY_SPEC) as Array<keyof Repositories>).map((key) => [
       key,
       wrapRepo(
         key,
         options.pg[key] as unknown as object,
         options.memory[key] as unknown as object,
-        SPEC[key],
+        REPOSITORY_SPEC[key],
         context,
       ),
     ]),

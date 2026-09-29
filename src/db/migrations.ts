@@ -12,7 +12,7 @@ export interface Migration {
 export const MIGRATIONS: Migration[] = [
   {
     version: '0001_init',
-    description: 'базовая схема: пользователи, события, участники, покупки, расчёты, шаблоны, сессии',
+    description: 'базовая схема: пользователи, события, участники, покупки, шаблоны, сессии',
     sql: `
 CREATE TABLE IF NOT EXISTS users (
   user_id        bigint PRIMARY KEY,
@@ -138,6 +138,15 @@ ALTER TABLE users
 
 ALTER TABLE users
   DROP COLUMN IF EXISTS payment_handle;
+`,
+  },
+  {
+    version: '0004_participants_user_idx',
+    description: 'индекс по участнику: «Мои события» не должны читать всю таблицу заявок',
+    sql: `
+-- listForUser ищет заявки по user_id, а был только индекс по (event_id, created_at):
+-- запрос читал всю таблицу. Индекс по user_id закрывает этот и подобные обходы.
+CREATE INDEX IF NOT EXISTS participants_user_idx ON participants (user_id, created_at);
 `,
   },
 ];

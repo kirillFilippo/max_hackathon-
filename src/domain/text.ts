@@ -12,14 +12,14 @@ export const normalizeUserText = (value: string): string =>
 export const normalizeUserTextSpaces = (value: string): string =>
   normalizeUserText(value).replace(/\s+/g, ' ');
 
-/** Вариант без пробелов вообще: «1 200,50 ₽» → «1200,50₽». */
+/** Вариант без пробелов вообще: «1 200,50» → «1200,50». */
 export const normalizeUserTextTight = (value: string): string =>
   normalizeUserText(value).replace(/\s|\u00a0/g, '');
 
 /**
  * Разбирает число из пользовательского ввода: «2,5», «1 200», «-3».
- * Возвращает null, если это не число. Одна реализация на ответы участника,
- * ограничения вопросов из мини-приложения и разбор сумм.
+ * Возвращает null, если это не число. Одна реализация на ответы участника
+ * и ограничения вопросов из чата и мини-приложения.
  */
 export const parseDecimal = (value: unknown): number | null => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;

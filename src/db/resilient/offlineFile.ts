@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import path from 'node:path';
 
 import type { Logger } from '../../logger.js';
-import type { MemorySnapshot } from '../memory/store.js';
+import { MEMORY_SNAPSHOT_VERSION, type MemorySnapshot } from '../memory/store.js';
 
 /**
  * Сохранение памяти на диск на время обрыва связи.
@@ -33,6 +33,15 @@ export const createOfflineStateFile = (filePath: string, logger: Logger): Offlin
       if (!existsSync(resolved)) return null;
       try {
         const parsed = JSON.parse(readFileSync(resolved, 'utf8')) as MemorySnapshot;
+        // Снимок чужого формата не поднимаем: лучше потерять данные обрыва,
+        // чем восстановить их криво и потом записать это в базу.
+        if (parsed.version !== MEMORY_SNAPSHOT_VERSION) {
+          logger.warn(
+            `Офлайн-снимок ${resolved} версии ${String(parsed.version)} несовместим `
+              + `с текущей (${MEMORY_SNAPSHOT_VERSION}) — оставляю файл без изменений.`,
+          );
+          return null;
+        }
         logger.warn(`Поднимаю данные из офлайн-снимка ${resolved} (база была недоступна при остановке).`);
         return parsed;
       } catch (error) {

@@ -10,7 +10,7 @@ import {
   plural,
   tzParts,
   zonedToUtc,
-} from '../src/domain/datetime.js';
+} from '../src/domain/datetime/index.js';
 
 const TZ = 'Europe/Moscow';
 const NOW = new Date('2025-10-20T10:00:00.000Z'); // 13:00 по Москве

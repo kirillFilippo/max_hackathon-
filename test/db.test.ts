@@ -186,3 +186,29 @@ describe('Сессии в базе', () => {
     assert.equal(await reloaded.get('1:1'), undefined);
   });
 });
+
+describe('Миграции схемы', () => {
+  it('применяет все миграции повторно без ошибок и создаёт индекс по участнику', async () => {
+    const { migrate } = await import('../src/db/migrate.js');
+    const { MIGRATIONS } = await import('../src/db/migrations.js');
+
+    // Идемпотентность: прогон по уже мигрированной базе ничего не делает.
+    assert.deepEqual(await migrate(harness.db, harness.logger), []);
+
+    const applied = await harness.db.query<{ version: string }>(
+      'SELECT version FROM schema_migrations ORDER BY version',
+    );
+    assert.deepEqual(
+      applied.rows.map((row) => row.version),
+      MIGRATIONS.map((migration) => migration.version),
+      'в базе не весь список миграций',
+    );
+
+    // «Мои события» ищут заявки по user_id: под это должен быть индекс,
+    // иначе каждый такой запрос читает всю таблицу заявок.
+    const index = await harness.db.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'participants' AND indexname = 'participants_user_idx'",
+    );
+    assert.equal(index.rows.length, 1, 'индекс participants_user_idx не создан');
+  });
+});

@@ -1,6 +1,6 @@
 import { newItemId } from '../../domain/ids.js';
 import type { EventItem, ItemWithReservation, Reservation } from '../../domain/types.js';
-import { toIso, toIsoOrNull, toNumberOrNull } from '../mappers.js';
+import { toIso, toNumberOrNull } from '../mappers.js';
 import type { Db } from '../pool.js';
 import type { ItemsRepository, ReserveResult } from './contracts.js';
 

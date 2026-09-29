@@ -162,12 +162,3 @@ export interface EventStats {
   free: number | null;
   confirmedShare: number;
 }
-
-/** Строка списка покупок в расчёте. */
-export interface SettlementItem {
-  id: string;
-  title: string;
-  reservedByUserId: number | null;
-  reservedByName: string | null;
-  paidKopecks: number | null;
-}
